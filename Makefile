@@ -120,3 +120,17 @@ dbt-docs:
 	cd transform/ilam_transform && \
 	  ../../.venv/bin/dbt docs generate --profiles-dir . 2>/dev/null
 	@echo "$(GREEN)Docs generated. Run 'dbt docs serve' to view.$(RESET)"
+
+flink-job:
+	@echo "$(CYAN)Submitting Flink CDR streaming job...$(RESET)"
+	bash ingestion/streaming/submit_flink_job.sh
+	@echo "$(GREEN)Job submitted. Check http://localhost:8081$(RESET)"
+
+kafka-topics:
+	@echo "$(CYAN)Listing Kafka topics...$(RESET)"
+	docker exec ilam-kafka /opt/kafka/bin/kafka-topics.sh \
+	  --bootstrap-server localhost:9092 --list
+
+produce:
+	@echo "$(CYAN)Starting Kafka producer...$(RESET)"
+	.venv/bin/python3 ingestion/streaming/kafka_producer.py

@@ -134,10 +134,10 @@ services:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_LISTENERS: PLAINTEXT://:9092,EXTERNAL://:9094,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://ilam-kafka:9092,EXTERNAL://localhost:9094
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@ilam-kafka:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
@@ -187,17 +187,30 @@ services:
     container_name: ilam-flink-jobmanager
     restart: unless-stopped
     command: jobmanager
+    volumes:
+      - ./infra/flink/jars/flink-connector-kafka-3.1.0-1.18.jar:/opt/flink/lib/flink-connector-kafka-3.1.0-1.18.jar
+      - ./infra/flink/jars/iceberg-flink-runtime-1.18-1.5.2.jar:/opt/flink/lib/iceberg-flink-runtime-1.18-1.5.2.jar
+      - ./infra/flink/jars/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar:/opt/flink/lib/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar
+      - ./infra/flink/jars/bundle-2.20.18.jar:/opt/flink/lib/bundle-2.20.18.jar
+      - ./infra/flink/jars/kafka-clients-3.4.0.jar:/opt/flink/lib/kafka-clients-3.4.0.jar
+      - ./infra/flink/flink-conf-extra.yaml:/opt/flink/conf/flink-conf-extra.yaml
+      - ./infra/flink/jars/flink-s3-fs-hadoop-1.18.1.jar:/opt/flink/lib/flink-s3-fs-hadoop-1.18.1.jar
     environment:
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: flink-jobmanager
         taskmanager.numberOfTaskSlots: 4
         parallelism.default: 2
-        state.backend: rocksdb
-        state.checkpoints.dir: s3://flink-checkpoints/checkpoints
         s3.endpoint: http://minio:9000
-        s3.access-key: ${MINIO_ROOT_USER:-ilam_admin}
-        s3.secret-key: ${MINIO_ROOT_PASSWORD:-ilam_password_2025}
+        s3.access-key: ilam_admin
+        s3.secret-key: ilam_password_2025
         s3.path.style.access: true
+        s3.ssl.enabled: false
+        state.backend: hashmap
+        state.checkpoints.dir: s3://flink-checkpoints/checkpoints
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: ilam_admin
+      AWS_SECRET_ACCESS_KEY: ilam_password_2025
+      AWS_DEFAULT_REGION: us-east-1 
     ports:
       - "${FLINK_JOBMANAGER_PORT:-8081}:8081"
     depends_on:
@@ -218,17 +231,30 @@ services:
     command: taskmanager
     depends_on:
       - flink-jobmanager
+    volumes:
+      - ./infra/flink/jars/flink-connector-kafka-3.1.0-1.18.jar:/opt/flink/lib/flink-connector-kafka-3.1.0-1.18.jar
+      - ./infra/flink/jars/iceberg-flink-runtime-1.18-1.5.2.jar:/opt/flink/lib/iceberg-flink-runtime-1.18-1.5.2.jar
+      - ./infra/flink/jars/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar:/opt/flink/lib/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar
+      - ./infra/flink/jars/bundle-2.20.18.jar:/opt/flink/lib/bundle-2.20.18.jar
+      - ./infra/flink/jars/kafka-clients-3.4.0.jar:/opt/flink/lib/kafka-clients-3.4.0.jar
+      - ./infra/flink/flink-conf-extra.yaml:/opt/flink/conf/flink-conf-extra.yaml
+      - ./infra/flink/jars/flink-s3-fs-hadoop-1.18.1.jar:/opt/flink/lib/flink-s3-fs-hadoop-1.18.1.jar
     environment:
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: flink-jobmanager
         taskmanager.numberOfTaskSlots: 4
         parallelism.default: 2
-        state.backend: rocksdb
-        state.checkpoints.dir: s3://flink-checkpoints/checkpoints
         s3.endpoint: http://minio:9000
-        s3.access-key: ${MINIO_ROOT_USER:-ilam_admin}
-        s3.secret-key: ${MINIO_ROOT_PASSWORD:-ilam_password_2025}
+        s3.access-key: ilam_admin
+        s3.secret-key: ilam_password_2025
         s3.path.style.access: true
+        s3.ssl.enabled: false
+        state.backend: hashmap
+        state.checkpoints.dir: s3://flink-checkpoints/checkpoints
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: ilam_admin
+      AWS_SECRET_ACCESS_KEY: ilam_password_2025
+      AWS_DEFAULT_REGION: us-east-1  
     networks:
       - ilam-net
 
