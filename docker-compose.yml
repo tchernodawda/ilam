@@ -291,8 +291,6 @@ services:
     environment:
       <<: *airflow-env
     volumes:
-      - ./orchestration/dags:/opt/airflow/dags
-      - ./transform:/opt/airflow/transform
       - airflow_logs:/opt/airflow/logs
     ports:
       - "${AIRFLOW_PORT:-8082}:8080"
@@ -315,8 +313,6 @@ services:
     environment:
       <<: *airflow-env
     volumes:
-      - ./orchestration/dags:/opt/airflow/dags
-      - ./transform:/opt/airflow/transform
       - airflow_logs:/opt/airflow/logs
     command: scheduler
     networks:

@@ -134,3 +134,73 @@ kafka-topics:
 produce:
 	@echo "$(CYAN)Starting Kafka producer...$(RESET)"
 	.venv/bin/python3 ingestion/streaming/kafka_producer.py
+
+deploy-dags:
+	@echo "$(CYAN)Deploying DAGs to Airflow...$(RESET)"
+	bash scripts/deploy_dags.sh
+	@echo "$(GREEN)DAGs deployed.$(RESET)"
+
+airflow-logs:
+	@echo "$(CYAN)Tailing Airflow scheduler logs...$(RESET)"
+	docker logs ilam-airflow-scheduler -f --tail=50
+
+airflow-trigger:
+	@echo "$(CYAN)Triggering Airflow pipeline...$(RESET)"
+	docker exec ilam-airflow-scheduler \
+	  airflow dags trigger ilam_sonatel_pipeline 2>/dev/null
+	@echo "$(GREEN)Pipeline triggered. Check http://localhost:8082$(RESET)"
+
+airflow-pause:
+	@echo "$(CYAN)Pausing Airflow pipeline...$(RESET)"
+	docker exec ilam-airflow-scheduler \
+	  airflow dags pause ilam_sonatel_pipeline 2>/dev/null
+	@echo "$(GREEN)Pipeline paused.$(RESET)"
+
+airflow-unpause:
+	@echo "$(CYAN)Unpausing Airflow pipeline...$(RESET)"
+	docker exec ilam-airflow-scheduler \
+	  airflow dags unpause ilam_sonatel_pipeline 2>/dev/null
+	@echo "$(GREEN)Pipeline unpaused.$(RESET)"
+
+airflow-clear:
+	@echo "$(CYAN)Clearing all DAG runs...$(RESET)"
+	docker exec ilam-airflow-scheduler \
+	  airflow dags clear ilam_sonatel_pipeline --yes 2>/dev/null
+	@echo "$(GREEN)All runs cleared.$(RESET)"
+
+airflow-status:
+	@echo "$(CYAN)Last DAG runs status...$(RESET)"
+	docker exec ilam-airflow-scheduler \
+	  airflow dags list-runs \
+	  -d ilam_sonatel_pipeline 2>/dev/null | tail -5
+
+airflow-logs:
+	@echo "$(CYAN)Tailing Airflow scheduler logs...$(RESET)"
+	docker logs ilam-airflow-scheduler -f --tail=30 2>/dev/null | \
+	  grep -E "generate_bronze|verify|dbt_run|dbt_test|success|failed|ERROR"
+
+airflow-restart:
+	@echo "$(CYAN)Restarting Airflow services...$(RESET)"
+	docker compose restart airflow-webserver airflow-scheduler
+	@echo "$(GREEN)Airflow restarted.$(RESET)"
+
+airflow-delete-dag:
+	@echo "$(CYAN)Deleting DAG from Airflow metadata...$(RESET)"
+	docker exec ilam-airflow-scheduler \
+	  airflow dags delete ilam_sonatel_pipeline --yes 2>/dev/null
+	@echo "$(GREEN)DAG deleted.$(RESET)"
+
+pipeline-run:
+	@echo "$(CYAN)Running full pipeline (stop non-essential services first)...$(RESET)"
+	docker compose stop flink-jobmanager flink-taskmanager kafka grafana prometheus 2>/dev/null || true
+	@sleep 5
+	$(MAKE) airflow-clear
+	$(MAKE) airflow-unpause
+	$(MAKE) airflow-trigger
+	@echo "$(GREEN)Pipeline started. Monitor at http://localhost:8082$(RESET)"
+
+pipeline-stop:
+	@echo "$(CYAN)Stopping pipeline...$(RESET)"
+	$(MAKE) airflow-pause
+	$(MAKE) airflow-clear
+	@echo "$(GREEN)Pipeline stopped.$(RESET)"
