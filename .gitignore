@@ -44,3 +44,6 @@ secrets/
 *.orc
 *.csv
 data/
+
+# Flink JARs — trop volumineux pour GitHub (>100MB)
+infra/flink/jars/*.jar

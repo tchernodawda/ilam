@@ -211,3 +211,21 @@ airflow-kill:
 	  airflow dags clear ilam_sonatel_pipeline \
 	  --only-running --yes 2>/dev/null
 	@echo "$(GREEN)Running runs killed.$(RESET)"
+
+download-flink-jars:
+	@echo "$(CYAN)Downloading Flink JARs...$(RESET)"
+	mkdir -p infra/flink/jars
+	wget -q -O infra/flink/jars/flink-connector-kafka-3.1.0-1.18.jar \
+	  "https://repo1.maven.org/maven2/org/apache/flink/flink-connector-kafka/3.1.0-1.18/flink-connector-kafka-3.1.0-1.18.jar"
+	wget -q -O infra/flink/jars/iceberg-flink-runtime-1.18-1.5.2.jar \
+	  "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-flink-runtime-1.18/1.5.2/iceberg-flink-runtime-1.18-1.5.2.jar"
+	wget -q -O infra/flink/jars/bundle-2.20.18.jar \
+	  "https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.20.18/bundle-2.20.18.jar"
+	wget -q -O infra/flink/jars/kafka-clients-3.4.0.jar \
+	  "https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.4.0/kafka-clients-3.4.0.jar"
+	docker cp infra/flink/jars/flink-s3-fs-hadoop-1.18.1.jar \
+	  ilam-flink-jobmanager:/opt/flink/opt/flink-s3-fs-hadoop-1.18.1.jar 2>/dev/null || \
+	  docker exec ilam-flink-jobmanager cp \
+	  /opt/flink/opt/flink-s3-fs-hadoop-1.18.1.jar \
+	  infra/flink/jars/flink-s3-fs-hadoop-1.18.1.jar 2>/dev/null || true
+	@echo "$(GREEN)JARs downloaded.$(RESET)"
