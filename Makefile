@@ -204,3 +204,10 @@ pipeline-stop:
 	$(MAKE) airflow-pause
 	$(MAKE) airflow-clear
 	@echo "$(GREEN)Pipeline stopped.$(RESET)"
+
+airflow-kill:
+	@echo "$(CYAN)Killing running DAG runs...$(RESET)"
+	docker exec ilam-airflow-scheduler \
+	  airflow dags clear ilam_sonatel_pipeline \
+	  --only-running --yes 2>/dev/null
+	@echo "$(GREEN)Running runs killed.$(RESET)"
