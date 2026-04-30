@@ -1,6 +1,6 @@
 # Ilam — Open-Source Data Lakehouse Platform
 
-> *Ilam* means **"the lake", "the flow", "the water current", or "the stream"** in Pulaar — data flowing from raw sources to insight, continuously and autonomously.
+> *Ilam* means **"the lake"**, **"the flow"**, **"the water current"**, or **"the stream"** in Pulaar — data flowing from raw sources to insight, continuously and autonomously.
 
 <p align="center">
   <a href="LICENSE">
@@ -11,16 +11,59 @@
   <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" />
 </p>
 
-Ilam is a fully open-source, end-to-end Data Lakehouse platform designed to unify
-high-performance storage, real-time stream processing, semantic transformation, and
-intelligent orchestration — with zero proprietary dependencies.
+Ilam is a fully open-source, end-to-end Data Lakehouse platform designed to unify high-performance storage, real-time stream processing, semantic transformation, and intelligent orchestration — with zero proprietary dependencies.
 
-At its core, Ilam introduces an **agentic intelligence layer** that transcends static
-pipeline orchestration toward a dynamic, self-adaptive data flow management system,
-optimizing resilience and observability from end to end.
+At its core, Ilam introduces an **agentic intelligence layer** that transcends static pipeline orchestration toward a dynamic, self-adaptive data flow management system, optimizing resilience and observability from end to end.
 
-Built on real-world telecom data from the **Sonatel / Orange Senegal** context,
-covering CDR (voice, SMS, data), network events, CRM, and Orange Money transactions.
+Built on real-world telecom data from the **Sonatel / Orange Sénégal** context, covering CDR (voice, SMS, data), network events, CRM, and Orange Money transactions.
+
+## Table of Contents
+
+- [Project Structure](#project-structure)
+- [Architecture](#architecture)
+- [Tech Stack](#tech-stack)
+- [Data Model](#data-model--sonatel-telecom)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Service URLs](#service-urls)
+- [Makefile Reference](#makefile-reference)
+- [Streaming Pipeline](#streaming-pipeline-kafka--flink)
+- [Orchestration](#orchestration--airflow)
+- [Architecture Decision Records](#architecture-decision-records)
+- [Roadmap](#roadmap)
+- [License](#license)
+
+## Project Structure
+
+```
+ilam/
+├── docs/
+│   └── decisions/               Architecture Decision Records (ADR-001 to ADR-004)
+├── infra/
+│   ├── trino/                   Trino catalog and server configuration
+│   ├── flink/                   Flink configuration and JARs (see make download-flink-jars)
+│   └── monitoring/              Prometheus and Grafana configuration
+├── ingestion/
+│   ├── generators/              Sonatel simulated data generator (Python + Faker)
+│   ├── streaming/               Kafka producer + Flink SQL job
+│   └── kafka-connect/           Kafka Connect connector configs (production)
+├── warehouse/
+│   ├── bronze/ddl/              Raw layer DDL — 9 tables
+│   ├── silver/ddl/              Enriched layer DDL — 5 tables
+│   └── gold/ddl/                Analytical layer DDL — 6 tables
+├── transform/
+│   └── ilam_transform/          dbt project (models, tests, macros)
+├── orchestration/
+│   └── dags/                    Airflow DAGs + data generator
+├── scripts/
+│   └── deploy_dags.sh           DAG deployment script (WSL2 workaround)
+├── agents/                      Agentic intelligence layer (coming — Step 9)
+├── quality/                     Great Expectations suites (coming — Step 6)
+├── .env.example                 Environment variables template
+├── docker-compose.yml           Full infrastructure definition
+├── Makefile                     All lifecycle commands
+└── requirements.txt             Python dependencies
+```
 
 ## Architecture
 
@@ -37,7 +80,8 @@ covering CDR (voice, SMS, data), network events, CRM, and Orange Money transacti
 ├─────────────────────────────────────────────────────────────────┤
 │  Storage                  Apache Iceberg · MinIO · Parquet      │
 ├─────────────────────────────────────────────────────────────────┤
-│  Ingestion                Apache Flink · stream · exactly-once  │
+│  Ingestion                Apache Kafka · Apache Flink           │
+│                           stream processing · exactly-once      │
 ├─────────────────────────────────────────────────────────────────┤
 │  Security                 Keycloak · Apache Ranger · mTLS       │
 │  Observability            Prometheus · Grafana · OpenLineage    │
@@ -46,36 +90,36 @@ covering CDR (voice, SMS, data), network events, CRM, and Orange Money transacti
 
 ## Tech Stack
 
-| Layer | Tool | Role |
-|-------|------|------|
-| Ingestion | Apache Flink 1.18 | Stream processing, exactly-once guarantees |
-| Storage | MinIO | S3-compatible object storage, Erasure Coding |
-| Table format | Apache Iceberg | ACID transactions, MVCC, time travel |
-| Catalog | tabulario/iceberg-rest + PostgreSQL | Persistent REST Iceberg catalog |
-| Query engine | Trino 435 | Distributed SQL, multi-source federation |
-| Transformation | dbt Core | ELT pipelines, semantic layer |
-| Orchestration | Apache Airflow 2.8 | DAG-based pipeline orchestration |
-| Data quality | Great Expectations | Automated data quality checks |
-| Monitoring | Prometheus + Grafana | Metrics collection and dashboards |
-| Lineage | OpenLineage + Marquez | End-to-end data lineage |
-| Security | Keycloak + Apache Ranger | Authentication and fine-grained authorization |
-| Agents | LangGraph | Agentic intelligence layer |
+| Layer | Tool | Version | Role |
+|-------|------|---------|------|
+| Ingestion (stream) | Apache Kafka | KRaft | Event streaming, CDR ingestion |
+| Ingestion (stream) | Apache Flink | 1.18 | Stream processing, exactly-once |
+| Storage | MinIO | latest | S3-compatible object storage |
+| Table format | Apache Iceberg | 1.5.2 | ACID transactions, time travel |
+| Catalog | iceberg-rest + PostgreSQL | — | Persistent REST catalog |
+| Query engine | Trino | 435 | Distributed SQL, MPP |
+| Transformation | dbt Core | — | ELT pipelines, semantic layer |
+| Orchestration | Apache Airflow | 2.8.1 | DAG orchestration |
+| Data quality | Great Expectations | — | Automated quality checks |
+| Monitoring | Prometheus + Grafana | — | Metrics and dashboards |
+| Lineage | OpenLineage + Marquez | — | End-to-end data lineage |
+| Security | Keycloak + Apache Ranger | — | AuthN/AuthZ |
+| Agents | LangGraph | — | Agentic intelligence layer |
 
 ## Data Model — Sonatel Telecom
 
-The platform is built around a realistic Senegalese telecom data model:
+The platform is built around a realistic Senegalese telecom data model following the Medallion architecture.
 
 | Layer | Tables | Description |
 |-------|--------|-------------|
-| Bronze | network_events, cdr_voice, cdr_sms, cdr_data | Raw network and CDR data |
-| Bronze | subscribers, contracts, recharges, complaints, om_transactions | Raw CRM and Orange Money |
-| Silver | network_events, cdr_enriched, subscribers, contracts, om_transactions | Enriched business entities |
-| Gold | mart_revenue, mart_network_quality, mart_churn, mart_arpu, mart_om_activity, mart_usage | Analytical Data Marts |
+| Bronze | `cdr_voice`, `cdr_sms`, `cdr_data`, `network_events` | Raw CDR and network data |
+| Bronze | `subscribers`, `contracts`, `recharges`, `complaints`, `om_transactions` | Raw CRM and Orange Money |
+| Silver | `cdr_enriched`, `network_events`, `subscribers`, `contracts`, `om_transactions` | Enriched business entities |
+| Gold | `mart_revenue`, `mart_network_quality`, `mart_churn`, `mart_arpu`, `mart_om_activity`, `mart_usage` | Analytical Data Marts |
 
 ## Prerequisites
 
-- Docker >= 24.0
-- Docker Compose >= 2.20
+- Docker >= 24.0 and Docker Compose >= 2.20
 - Make
 - Python 3.10+ with venv
 - 8 GB RAM minimum (16 GB recommended)
@@ -88,7 +132,7 @@ The platform is built around a realistic Senegalese telecom data model:
 git clone https://github.com/thiernodaoudaly/ilam.git
 cd ilam
 cp .env.example .env
-# Edit .env — generate a Fernet key for Airflow:
+# Generate a Fernet key for Airflow:
 # python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 
 # 2. Create Python virtual environment
@@ -97,16 +141,19 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # 3. Start all services
-make start
+make start && make health
 
-# 4. Check services health
-make health
+# 4. Initialize the warehouse (first time only)
+make init-warehouse
 
-# 5. Generate simulated Sonatel data (first time only)
-make generate-data
+# 5. Generate simulated Sonatel data
+make generate-data && make verify-data
 
-# 6. Verify data was loaded
-make verify-data
+# 6. Run dbt transformations
+make dbt-run && make dbt-test
+
+# 7. Deploy and trigger Airflow pipeline
+make deploy-dags && make pipeline-run
 ```
 
 ## Service URLs
@@ -124,75 +171,119 @@ make verify-data
 ## Makefile Reference
 
 ```bash
-# Infrastructure lifecycle
-make start            # Start all services
-make stop             # Stop all services
-make restart          # Restart all services
-make status           # Show containers status
-make health           # Check all services health
-make logs             # Tail all service logs
-make clean            # Remove containers and volumes
+# Infrastructure
+make start              # Start all services
+make stop               # Stop all services
+make health             # Check all services health
+make clean              # Remove containers and volumes
 
-# Warehouse management
-make init-warehouse   # Create Iceberg schemas and tables (first time only)
-make show-tables      # List all Iceberg tables (Bronze / Silver / Gold)
-make trino-cli        # Open interactive Trino SQL shell
+# Warehouse
+make init-warehouse     # Create Iceberg schemas and tables (first time only)
+make verify-data        # Check row counts in Bronze tables
+make trino-cli          # Open interactive Trino SQL shell
 
-# Data
-make generate-data    # Generate and insert simulated Sonatel telecom data
-make verify-data      # Check row counts in all Bronze tables
+# Data & Transformations
+make generate-data      # Generate simulated Sonatel data
+make dbt-run            # Run dbt transformations (Bronze → Silver → Gold)
+make dbt-test           # Run dbt data quality tests
+
+# Streaming (Kafka + Flink)
+make produce            # Start Kafka CDR producer
+make flink-job          # Submit Flink streaming job
+make download-flink-jars # Download required Flink JARs
+
+# Orchestration (Airflow)
+make deploy-dags        # Deploy DAGs to Airflow containers
+make pipeline-run       # Run full pipeline (stops non-essential services)
+make pipeline-stop      # Stop pipeline
+make airflow-status     # Show last DAG runs status
+make airflow-logs       # Tail scheduler logs
 ```
 
-## Project Structure
+## Streaming Pipeline — Kafka + Flink
+
+The streaming pipeline ingests real-time CDR events from Kafka into Iceberg Bronze tables.
 
 ```
-ilam/
-├── docs/
-│   └── decisions/          Architecture Decision Records (ADR-001 to ADR-004)
-├── infra/
-│   ├── trino/              Trino catalog and server configuration
-│   └── monitoring/         Prometheus and Grafana configuration
-├── ingestion/
-│   └── generators/         Sonatel simulated data generator (Python)
-├── warehouse/
-│   ├── bronze/ddl/         Raw layer DDL (9 tables)
-│   ├── silver/ddl/         Enriched layer DDL (5 tables)
-│   └── gold/ddl/           Analytical layer DDL (6 tables)
-├── transform/              dbt project (coming)
-├── orchestration/          Airflow DAGs (coming)
-├── agents/                 Agentic intelligence layer (coming)
-├── quality/                Great Expectations suites (coming)
-├── scripts/                Utility scripts
-├── .env.example            Environment variables template
-├── docker-compose.yml      Full infrastructure definition
-├── Makefile                Infrastructure and data lifecycle commands
-└── requirements.txt        Python dependencies
+Python Producer (simulates MSC/GGSN)
+        ↓  localhost:9094
+    Apache Kafka (KRaft)
+    ├── cdr_voice_stream    (3 partitions)
+    └── network_events_stream (3 partitions)
+        ↓  ilam-kafka:9092
+    Apache Flink SQL Job
+        ↓
+    iceberg.bronze.cdr_voice
+    iceberg.bronze.network_events
 ```
+
+```bash
+# Start producer (Terminal 1)
+.venv/bin/python3 ingestion/streaming/kafka_producer.py
+
+# Submit Flink job (Terminal 2)
+make flink-job
+
+# Download JARs (first time)
+make download-flink-jars
+```
+
+> **Note:** In production, the Python producer is replaced by Kafka Connect connectors (Debezium CDC for Oracle CRM, FileStream for CDR files, HTTP Source for Orange Money). See `ingestion/kafka-connect/README.md`.
+
+> **Known limitation:** Flink SQL Client checkpointing not triggering in WSL2+Docker environment. Jobs run in RUNNING state but Iceberg commits require a dedicated infrastructure. See `docs/decisions/` for details.
+
+## Orchestration — Airflow
+
+The `ilam_sonatel_pipeline` DAG orchestrates the full Bronze → Silver → Gold pipeline.
+
+```
+health_check → generate_bronze_data → verify_bronze_counts
+    → dbt_run → dbt_test → verify_gold_marts → pipeline_summary
+```
+
+**Execution results (last successful run):**
+
+| Mart | Rows |
+|------|------|
+| mart_revenue | 897 |
+| mart_arpu | 112 |
+| mart_churn | 40 |
+| mart_usage | 840 |
+
+```bash
+# Deploy and run
+make deploy-dags
+make pipeline-run
+
+# Monitor at http://localhost:8082
+```
+
+> **Deployment note:** Due to WSL2 bind mount limitations, DAGs are deployed via `docker cp` using `scripts/deploy_dags.sh` rather than a volume mount.
 
 ## Architecture Decision Records
 
-| ADR | Decision | Status |
-|-----|----------|--------|
-| [ADR-001](docs/decisions/ADR-001-iceberg-vs-delta.md) | Apache Iceberg over Delta Lake | Accepted |
-| [ADR-002](docs/decisions/ADR-002-trino-vs-spark.md) | Trino over Spark SQL | Accepted |
-| [ADR-003](docs/decisions/ADR-003-minio-vs-s3.md) | MinIO for data sovereignty | Accepted |
-| [ADR-004](docs/decisions/ADR-004-iceberg-rest-vs-nessie.md) | iceberg-rest over Nessie (dev) | Accepted |
+| ADR | Decision | Rationale |
+|-----|----------|-----------|
+| [ADR-001](docs/decisions/ADR-001-iceberg-vs-delta.md) | Apache Iceberg over Delta Lake | Vendor-neutral, REST catalog support |
+| [ADR-002](docs/decisions/ADR-002-trino-vs-spark.md) | Trino over Spark SQL | Lighter footprint, faster ad-hoc queries |
+| [ADR-003](docs/decisions/ADR-003-minio-vs-s3.md) | MinIO for data sovereignty | On-premise, S3-compatible, no cloud dependency |
+| [ADR-004](docs/decisions/ADR-004-iceberg-rest-vs-nessie.md) | iceberg-rest + PostgreSQL over Nessie | Simpler setup, persistent catalog |
 
 ## Roadmap
 
-- [x] Step 1 — Base infrastructure (Docker Compose, MinIO, Iceberg REST, Trino, Flink, Airflow)
-- [x] Step 2 — Iceberg tables DDL (Bronze / Silver / Gold) — 20 tables
-- [x] Step 3 — Simulated Sonatel data generator — 2 901 rows across 9 Bronze tables
-- [x] Step 3.1 — Persistent Iceberg REST catalog backed by PostgreSQL
-- [ ] Step 4 — dbt transformation models (Bronze → Silver → Gold)
-- [ ] Step 5 — Airflow orchestration DAGs
-- [ ] Step 6 — Data quality (Great Expectations)
-- [ ] Step 7 — Observability (Prometheus, Grafana dashboards)
-- [ ] Step 8 — Security (Keycloak, Apache Ranger)
-- [ ] Step 9 — Agentic intelligence layer (LangGraph, ReAct)
+- [x] **Step 1** — Base infrastructure (Docker Compose, MinIO, Iceberg REST, Trino, Flink, Airflow)
+- [x] **Step 2** — Iceberg DDL — 20 tables (Bronze / Silver / Gold)
+- [x] **Step 3** — Sonatel data generator — 9 Bronze tables, realistic telecom data
+- [x] **Step 3b** — Streaming pipeline — Kafka (KRaft) + Flink SQL *(partial — checkpointing blocked on WSL2)*
+- [x] **Step 4** — dbt transformations — 18 models (Bronze → Silver → Gold)
+- [x] **Step 5** — Airflow orchestration — 7-task DAG, end-to-end pipeline
+- [ ] **Step 6** — Data quality (Great Expectations)
+- [ ] **Step 7** — Observability (Prometheus dashboards, Grafana, OpenLineage)
+- [ ] **Step 8** — Security (Keycloak, Apache Ranger)
+- [ ] **Step 9** — Agentic intelligence layer (LangGraph, ReAct)
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE)
+[Apache License 2.0](LICENSE)
 
 *Built with purpose. Named after the flow.*
