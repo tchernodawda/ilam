@@ -41,7 +41,7 @@ curl http://kafka-connect:8083/connectors/sonatel-crm-cdc-connector/status
 curl http://kafka-connect:8083/connectors
 ```
 
-## Note — PFE Environment
+## Note
 
 In the PFE development environment, these connectors are replaced by a
 Python producer script (`ingestion/streaming/kafka_producer.py`) that

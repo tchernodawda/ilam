@@ -1,0 +1,9 @@
+execution:
+  result-mode: tableau
+  max-table-result-rows: 100
+
+configuration:
+  rest.connection-timeout: 120000
+  rest.idleness-timeout: 600000
+  rest.retry.max-attempts: 10
+  table.exec.sink.upsert-materialize: NONE

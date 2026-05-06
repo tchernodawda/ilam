@@ -121,10 +121,6 @@ dbt-docs:
 	  ../../.venv/bin/dbt docs generate --profiles-dir . 2>/dev/null
 	@echo "$(GREEN)Docs generated. Run 'dbt docs serve' to view.$(RESET)"
 
-flink-job:
-	@echo "$(CYAN)Submitting Flink CDR streaming job...$(RESET)"
-	bash ingestion/streaming/submit_flink_job.sh
-	@echo "$(GREEN)Job submitted. Check http://localhost:8081$(RESET)"
 
 kafka-topics:
 	@echo "$(CYAN)Listing Kafka topics...$(RESET)"
@@ -140,9 +136,6 @@ deploy-dags:
 	bash scripts/deploy_dags.sh
 	@echo "$(GREEN)DAGs deployed.$(RESET)"
 
-airflow-logs:
-	@echo "$(CYAN)Tailing Airflow scheduler logs...$(RESET)"
-	docker logs ilam-airflow-scheduler -f --tail=50
 
 airflow-trigger:
 	@echo "$(CYAN)Triggering Airflow pipeline...$(RESET)"
@@ -229,3 +222,35 @@ download-flink-jars:
 	  /opt/flink/opt/flink-s3-fs-hadoop-1.18.1.jar \
 	  infra/flink/jars/flink-s3-fs-hadoop-1.18.1.jar 2>/dev/null || true
 	@echo "$(GREEN)JARs downloaded.$(RESET)"
+
+flink-gateway:
+	@echo "$(CYAN)Starting Flink SQL Gateway...$(RESET)"
+	docker exec ilam-flink-jobmanager cp \
+	  /opt/flink/opt/flink-sql-gateway-1.18.1.jar \
+	  /opt/flink/lib/ 2>/dev/null || true
+	docker exec -d ilam-flink-jobmanager \
+	  /opt/flink/bin/sql-gateway.sh start \
+	  -Dsql-gateway.endpoint.rest.address=0.0.0.0 \
+	  -Dsql-gateway.endpoint.rest.port=8083
+	@sleep 5
+	@docker exec ilam-flink-jobmanager \
+	  wget -q -O- http://localhost:8083/v1/info
+	@echo "$(GREEN)SQL Gateway started.$(RESET)"
+
+flink-job:
+	@echo "$(CYAN)Submitting Flink CDR streaming job via SQL Gateway...$(RESET)"
+	bash ingestion/streaming/submit_flink_job.sh
+	@echo "$(GREEN)Job submitted. Check http://localhost:8081$(RESET)"
+
+streaming-start:
+	@echo "$(CYAN)Starting full streaming pipeline...$(RESET)"
+	$(MAKE) flink-gateway
+	@sleep 5
+	@echo "$(GREEN)Start Kafka producer in another terminal:$(RESET)"
+	@echo "  .venv/bin/python3 ingestion/streaming/kafka_producer.py"
+	@echo "Then run: make flink-job"
+
+pyflink-job:
+	@echo "$(CYAN)Submitting PyFlink streaming job...$(RESET)"
+	bash ingestion/streaming/submit_pyflink_job.sh
+	@echo "$(GREEN)Job submitted. Check http://localhost:8081$(RESET)"

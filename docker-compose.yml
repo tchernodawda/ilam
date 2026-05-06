@@ -31,6 +31,31 @@ services:
       retries: 5
     networks:
       - ilam-net
+
+  nifi:
+    image: apache/nifi:1.23.2
+    container_name: ilam-nifi
+    restart: unless-stopped
+    ports:
+      - "8443:8443"
+    environment:
+      SINGLE_USER_CREDENTIALS_USERNAME: ilam_admin
+      SINGLE_USER_CREDENTIALS_PASSWORD: ilam_password_2025
+      NIFI_WEB_HTTPS_PORT: 8443
+      NIFI_JVM_HEAP_INIT: 512m
+      NIFI_JVM_HEAP_MAX: 1g
+    volumes:
+      - nifi-data:/opt/nifi/nifi-current/data
+      - nifi-logs:/opt/nifi/nifi-current/logs
+      - nifi-conf:/opt/nifi/nifi-current/conf
+    networks:
+      - ilam-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:8443/nifi"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
   
   iceberg-catalog-db:
     image: postgres:15-alpine
@@ -198,21 +223,25 @@ services:
     environment:
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: flink-jobmanager
-        taskmanager.numberOfTaskSlots: 4
-        parallelism.default: 2
+        jobmanager.memory.process.size: 1024m
+        parallelism.default: 1
         s3.endpoint: http://minio:9000
         s3.access-key: ilam_admin
         s3.secret-key: ilam_password_2025
         s3.path.style.access: true
         s3.ssl.enabled: false
         state.backend: hashmap
-        state.checkpoints.dir: s3://flink-checkpoints/checkpoints
+        state.checkpoints.dir: s3://warehouse/flink-checkpoints
+        execution.checkpointing.interval: 30000
+        execution.checkpointing.mode: EXACTLY_ONCE
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: ilam_admin
       AWS_SECRET_ACCESS_KEY: ilam_password_2025
       AWS_DEFAULT_REGION: us-east-1 
     ports:
       - "${FLINK_JOBMANAGER_PORT:-8081}:8081"
+      - "8081:8081"
+      - "8083:8083"
     depends_on:
       minio:
         condition: service_healthy
@@ -242,15 +271,18 @@ services:
     environment:
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: flink-jobmanager
-        taskmanager.numberOfTaskSlots: 4
-        parallelism.default: 2
+        taskmanager.memory.process.size: 1024m
+        taskmanager.numberOfTaskSlots: 2
+        parallelism.default: 1
         s3.endpoint: http://minio:9000
         s3.access-key: ilam_admin
         s3.secret-key: ilam_password_2025
         s3.path.style.access: true
         s3.ssl.enabled: false
         state.backend: hashmap
-        state.checkpoints.dir: s3://flink-checkpoints/checkpoints
+        state.checkpoints.dir: s3://warehouse/flink-checkpoints
+        execution.checkpointing.interval: 30000
+        execution.checkpointing.mode: EXACTLY_ONCE
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: ilam_admin
       AWS_SECRET_ACCESS_KEY: ilam_password_2025
@@ -360,6 +392,12 @@ networks:
 volumes:
   postgres_data:
     name: ilam-postgres-data
+  nifi-data:
+    name: ilam-nifi-data
+  nifi-logs:
+    name: ilam-nifi-logs
+  nifi-conf:
+    name: ilam-nifi-conf
   minio_data:
     name: ilam-minio-data
   airflow_logs:
