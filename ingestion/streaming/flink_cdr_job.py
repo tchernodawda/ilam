@@ -172,9 +172,9 @@ def main():
             charge_amount,
             currency,
             offer_code,
-            TO_TIMESTAMP(start_ts,    'yyyy-MM-dd''T''HH:mm:ss.SSSSSS'),
-            TO_TIMESTAMP(end_ts,      'yyyy-MM-dd''T''HH:mm:ss.SSSSSS'),
-            TO_TIMESTAMP(ingested_at, 'yyyy-MM-dd''T''HH:mm:ss.SSSSSS'),
+            TO_TIMESTAMP(start_ts,    'yyyy-MM-dd HH:mm:ss.SSSSSS'),
+            TO_TIMESTAMP(end_ts,      'yyyy-MM-dd HH:mm:ss.SSSSSS'),
+            TO_TIMESTAMP(ingested_at, 'yyyy-MM-dd HH:mm:ss.SSSSSS'),
             TO_DATE(call_date, 'yyyy-MM-dd')
         FROM kafka_cdr_voice
         WHERE cdr_id IS NOT NULL
@@ -197,8 +197,8 @@ def main():
             vendor,
             raw_payload,
             source_system,
-            TO_TIMESTAMP(event_ts,    'yyyy-MM-dd''T''HH:mm:ss.SSSSSS'),
-            TO_TIMESTAMP(ingested_at, 'yyyy-MM-dd''T''HH:mm:ss.SSSSSS'),
+            TO_TIMESTAMP(event_ts,    'yyyy-MM-dd HH:mm:ss.SSSSSS'),
+            TO_TIMESTAMP(ingested_at, 'yyyy-MM-dd HH:mm:ss.SSSSSS'),
             TO_DATE(event_date, 'yyyy-MM-dd')
         FROM kafka_network_events
         WHERE event_id IS NOT NULL
