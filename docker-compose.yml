@@ -208,7 +208,10 @@ services:
       - ilam-net
 
   flink-jobmanager:
-    image: flink:1.18-scala_2.12
+    build:
+      context: ./infra/flink
+      dockerfile: Dockerfile
+    image: ilam-flink:1.18
     container_name: ilam-flink-jobmanager
     restart: unless-stopped
     command: jobmanager
@@ -231,7 +234,7 @@ services:
         s3.path.style.access: true
         s3.ssl.enabled: false
         state.backend: hashmap
-        state.checkpoints.dir: s3://warehouse/flink-checkpoints
+        state.checkpoints.dir: s3://flink-checkpoints/jobs
         execution.checkpointing.interval: 30000
         execution.checkpointing.mode: EXACTLY_ONCE
       AWS_REGION: us-east-1
@@ -254,7 +257,10 @@ services:
       - ilam-net
 
   flink-taskmanager:
-    image: flink:1.18-scala_2.12
+    build:
+      context: ./infra/flink
+      dockerfile: Dockerfile
+    image: ilam-flink:1.18
     container_name: ilam-flink-taskmanager
     restart: unless-stopped
     command: taskmanager
@@ -280,7 +286,7 @@ services:
         s3.path.style.access: true
         s3.ssl.enabled: false
         state.backend: hashmap
-        state.checkpoints.dir: s3://warehouse/flink-checkpoints
+        state.checkpoints.dir: s3://flink-checkpoints/jobs
         execution.checkpointing.interval: 30000
         execution.checkpointing.mode: EXACTLY_ONCE
       AWS_REGION: us-east-1
@@ -289,6 +295,33 @@ services:
       AWS_DEFAULT_REGION: us-east-1  
     networks:
       - ilam-net
+
+  flink-streaming-job:
+    build:
+      context: ./infra/flink
+      dockerfile: Dockerfile
+    image: ilam-flink:1.18
+    container_name: ilam-flink-streaming-job
+    restart: unless-stopped
+    depends_on:
+      flink-jobmanager:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    command: >
+      bash -c "
+        sleep 30 &&
+        /opt/flink/bin/flink run
+        --jobmanager flink-jobmanager:8081
+        --python /opt/flink/usrjobs/flink_cdr_job.py
+        --detached &&
+        echo 'Job submitted' &&
+        sleep infinity
+      "
+    volumes:
+      - ./ingestion/streaming/flink_cdr_job.py:/opt/flink/usrjobs/flink_cdr_job.py
+    networks:
+      - ilam-net  
 
   airflow-init:
     image: apache/airflow:2.8.1
