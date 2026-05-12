@@ -15,25 +15,26 @@ Ilam is a fully open-source, end-to-end Data Lakehouse platform built on real-wo
 
 ## Architecture
 
-┌─────────────────────────────────────────────────────────────────┐
-│  Agentic Layer         LangGraph · ReAct · autonomous agents    │
-├─────────────────────────────────────────────────────────────────┤
-│  Orchestration         Apache Airflow · DAGs · Sensors          │
-├───────────────────────────┬─────────────────────────────────────┤
-│  Transformation           │  Query Engine                       │
-│  dbt Core                 │  Trino · MPP · federation           │
-├───────────────────────────┴─────────────────────────────────────┤
-│  Medallion Architecture   Bronze → Silver → Gold                │
-├─────────────────────────────────────────────────────────────────┤
-│  Storage                  Apache Iceberg · MinIO · Parquet      │
-├──────────────────────────────────────┬──────────────────────────┤
-│  Ingestion — Streaming               │  Ingestion — Batch       │
-│  NiFi → Kafka → PyFlink              │  NiFi CRON → Kafka       │
-│  exactly-once · 5 topics             │  4 topics · @hourly      │
-├──────────────────────────────────────┴──────────────────────────┤
-│  Security                 Keycloak · Apache Ranger              │
-│  Observability            Prometheus · Grafana                  │
-└─────────────────────────────────────────────────────────────────┘
+```
++------------------------------------------------------------------+
+|  Agentic Layer         LangGraph / ReAct / autonomous agents     |
++------------------------------------------------------------------+
+|  Orchestration         Apache Airflow / DAGs / Sensors           |
++------------------------------------------------------------------+
+|  Transformation        dbt Core    |  Query Engine  Trino MPP    |
++------------------------------------------------------------------+
+|  Medallion Architecture      Bronze -> Silver -> Gold            |
++------------------------------------------------------------------+
+|  Storage               Apache Iceberg / MinIO / Parquet          |
++--------------------------------------+---------------------------+
+|  Ingestion Streaming                 |  Ingestion Batch          |
+|  NiFi -> Kafka -> PyFlink            |  NiFi CRON -> Kafka       |
+|  exactly-once / 5 topics             |  4 topics / hourly        |
++--------------------------------------+---------------------------+
+|  Security              Keycloak / Apache Ranger                  |
+|  Observability         Prometheus / Grafana                      |
++------------------------------------------------------------------+
+```
 
 ## Tech Stack
 
@@ -63,22 +64,27 @@ Ilam is a fully open-source, end-to-end Data Lakehouse platform built on real-wo
 
 ## Streaming Pipeline
 
+```
 NiFi (9 Process Groups)
-├── CDR Voice Pipeline       → cdr_voice_stream       (500ms)
-├── CDR SMS Pipeline         → cdr_sms_stream          (500ms)
-├── CDR Data Pipeline        → cdr_data_stream         (500ms)
-├── Network Events Pipeline  → network_events_stream   (2s)
-├── OM Transactions Pipeline → om_transactions_stream  (1s)
-├── Subscribers Batch        → subscribers_stream      (@hourly)
-├── Contracts Batch          → contracts_stream        (@hourly)
-├── Recharges Batch          → recharges_stream        (@30min)
-└── Complaints Batch         → complaints_stream       (@8am)
-↓
-Apache Kafka (9 topics, 3 partitions each)
-↓
-PyFlink (exactly-once, 30s checkpointing)
-↓
-Iceberg Bronze (9 tables) → MinIO
+  |-- CDR Voice Pipeline       -> cdr_voice_stream       (500ms)
+  |-- CDR SMS Pipeline         -> cdr_sms_stream          (500ms)
+  |-- CDR Data Pipeline        -> cdr_data_stream         (500ms)
+  |-- Network Events Pipeline  -> network_events_stream   (2s)
+  |-- OM Transactions Pipeline -> om_transactions_stream  (1s)
+  |-- Subscribers Batch        -> subscribers_stream      (@hourly)
+  |-- Contracts Batch          -> contracts_stream        (@hourly)
+  |-- Recharges Batch          -> recharges_stream        (@30min)
+  +-- Complaints Batch         -> complaints_stream       (@8am)
+          |
+          v
+  Apache Kafka (9 topics, 3 partitions each)
+          |
+          v
+  PyFlink (exactly-once, 30s checkpointing)
+          |
+          v
+  Iceberg Bronze (9 tables) -> MinIO
+```
 
 ## Prerequisites
 
