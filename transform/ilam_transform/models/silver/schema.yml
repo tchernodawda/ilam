@@ -5,11 +5,19 @@ models:
     description: "Enriched and deduplicated subscriber profiles with segmentation"
     columns:
       - name: subscriber_id
-        tests: [not_null, unique]
+        description: "Identifiant unique abonné Sonatel"
+        data_tests:
+          - not_null
+          - unique
       - name: msisdn
-        tests: [not_null, unique]
+        description: "Numéro de téléphone au format E.164"
+        data_tests:
+          - not_null
+          - unique
       - name: customer_segment
-        tests:
+        description: "Segment client calculé selon l'ancienneté"
+        data_tests:
+          - not_null
           - accepted_values:
               values: ['NEW', 'ESTABLISHED', 'LOYAL', 'PREMIUM']
 
@@ -17,9 +25,13 @@ models:
     description: "Unified CDR table (voice + SMS + data) enriched with subscriber profile"
     columns:
       - name: cdr_id
-        tests: [not_null]
+        description: "Identifiant unique CDR"
+        data_tests:
+          - not_null
       - name: cdr_type
-        tests:
+        description: "Type de CDR : VOICE, SMS ou DATA"
+        data_tests:
+          - not_null
           - accepted_values:
               values: ['VOICE', 'SMS', 'DATA']
 
@@ -27,4 +39,11 @@ models:
     description: "Enriched Orange Money transactions with categorization"
     columns:
       - name: transaction_id
-        tests: [not_null, unique]
+        description: "Identifiant unique transaction Orange Money"
+        data_tests:
+          - not_null
+          - unique
+      - name: amount
+        description: "Montant de la transaction en XOF"
+        data_tests:
+          - not_null

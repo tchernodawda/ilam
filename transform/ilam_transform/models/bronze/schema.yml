@@ -5,15 +5,24 @@ models:
     description: "Staging view over raw bronze subscribers table"
     columns:
       - name: subscriber_id
-        tests: [not_null, unique]
+        description: "Identifiant unique abonné Sonatel"
+        data_tests:
+          - not_null
+          - unique
       - name: msisdn
-        tests: [not_null]
+        description: "Numéro de téléphone au format E.164"
+        data_tests:
+          - not_null
       - name: account_type
-        tests:
+        description: "Type de compte : PREPAID ou POSTPAID"
+        data_tests:
+          - not_null
           - accepted_values:
               values: ['PREPAID', 'POSTPAID']
       - name: status
-        tests:
+        description: "Statut de l'abonné"
+        data_tests:
+          - not_null
           - accepted_values:
               values: ['ACTIVE', 'INACTIVE', 'SUSPENDED']
 
@@ -21,14 +30,34 @@ models:
     description: "Staging view over raw CDR voice table"
     columns:
       - name: cdr_id
-        tests: [not_null, unique]
+        description: "Identifiant unique CDR voix"
+        data_tests:
+          - not_null
+          - unique
+      - name: calling_msisdn
+        description: "MSISDN appelant"
+        data_tests:
+          - not_null
       - name: duration_seconds
-        tests: [not_null]
+        description: "Durée de l'appel en secondes"
+        data_tests:
+          - not_null
 
   - name: stg_om_transactions
     description: "Staging view over raw Orange Money transactions"
     columns:
       - name: transaction_id
-        tests: [not_null, unique]
+        description: "Identifiant unique transaction Orange Money"
+        data_tests:
+          - not_null
+          - unique
       - name: amount
-        tests: [not_null]
+        description: "Montant de la transaction en XOF"
+        data_tests:
+          - not_null
+      - name: status
+        description: "Statut de la transaction"
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['SUCCESS', 'FAILED', 'PENDING']

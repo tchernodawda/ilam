@@ -21,3 +21,6 @@ models:
     gold:
       +materialized: table
       +schema: gold
+
+flags:
+  require_certificate_validation: false

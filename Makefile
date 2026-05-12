@@ -254,3 +254,13 @@ pyflink-job:
 	@echo "$(CYAN)Submitting PyFlink streaming job...$(RESET)"
 	bash ingestion/streaming/submit_pyflink_job.sh
 	@echo "$(GREEN)Job submitted. Check http://localhost:8081$(RESET)"
+
+docs:
+	@echo "$(CYAN)Generating dbt documentation...$(RESET)"
+	@kill $$(lsof -ti:8086) 2>/dev/null || true
+	@cd transform/ilam_transform && \
+		../../.venv/bin/dbt docs generate --profiles-dir . --no-partial-parse 2>&1 | \
+		grep -E "OK|ERROR|Finished|catalog|Found" || true
+	@echo "$(GREEN)Starting dbt docs server on http://localhost:8086$(RESET)"
+	@cd transform/ilam_transform && \
+		../../.venv/bin/dbt docs serve --profiles-dir . --port 8086

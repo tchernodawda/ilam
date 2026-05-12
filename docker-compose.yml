@@ -310,18 +310,17 @@ services:
         condition: service_healthy
     command: >
       bash -c "
-        sleep 30 &&
-        /opt/flink/bin/flink run
-        --jobmanager flink-jobmanager:8081
-        --python /opt/flink/usrjobs/flink_cdr_job.py
-        --detached &&
-        echo 'Job submitted' &&
+        echo 'Waiting for Flink cluster...' &&
+        sleep 45 &&
+        echo 'Submitting PyFlink job...' &&
+        python3 /opt/flink/usrjobs/flink_cdr_job.py &&
+        echo 'Job submitted successfully' &&
         sleep infinity
       "
     volumes:
       - ./ingestion/streaming/flink_cdr_job.py:/opt/flink/usrjobs/flink_cdr_job.py
     networks:
-      - ilam-net  
+      - ilam-net
 
   airflow-init:
     image: apache/airflow:2.8.1

@@ -1,7 +1,20 @@
 ilam_transform:
-  target: dev
+  target: local
   outputs:
-    dev:
+    # Profil pour exécution depuis WSL2 directement
+    local:
+      type: trino
+      method: none
+      host: localhost
+      port: 8080
+      user: ilam
+      database: iceberg
+      schema: bronze
+      threads: 4
+      http_scheme: http
+
+    # Profil pour exécution depuis un conteneur Docker (Airflow)
+    docker:
       type: trino
       method: none
       host: trino
