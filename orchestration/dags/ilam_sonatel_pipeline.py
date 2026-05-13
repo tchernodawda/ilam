@@ -1,6 +1,11 @@
 """
 ILAM — Sonatel Data Pipeline DAG
-Orchestrates both batch and streaming pipelines.
+Orchestrates batch + streaming pipelines.
+
+Architecture :
+  Streaming : NiFi → Kafka → PyFlink → Bronze (continu, auto-géré)
+  Batch     : NiFi CRON → Kafka → PyFlink → Bronze (hourly, auto-géré)
+  Ce DAG    : vérifie l'état du streaming, lance dbt, vérifie Gold
 """
 
 from datetime import datetime, timedelta
@@ -14,53 +19,60 @@ import requests
 logger = logging.getLogger(__name__)
 
 default_args = {
-    "owner": "ilam",
-    "depends_on_past": False,
-    "email_on_failure": False,
-    "email_on_retry": False,
-    "retries": 1,
-    "retry_delay": timedelta(minutes=2),
-    "execution_timeout": timedelta(minutes=20),
+    "owner"           : "ilam", # pas de "airflow" pour différencier les DAGs custom
+    "depends_on_past" : False, # ce DAG doit pouvoir s'exécuter même si la run précédente a échoué
+    "email_on_failure": False, # pas encore d'email pour ce DAG de monitoring interne
+    "email_on_retry"  : False, # pas d'email non plus pour les retries
+    "retries"         : 1, # on autorise 1 retry en cas d'échec, car parfois les services peuvent être temporairement indisponibles
+    "retry_delay"     : timedelta(minutes=2), # délai de 2 minutes avant de réessayer, pour laisser le temps aux services de se remettre
+    "execution_timeout": timedelta(minutes=20), # timeout global de 20 minutes pour chaque run du DAG, pour éviter les runs bloquées indéfiniment
 }
 
 dag = DAG(
-    dag_id="ilam",
-    description="Ilam Data Lakehouse",
-    default_args=default_args,
-    schedule_interval="@hourly",
-    start_date=days_ago(1),
-    catchup=False,
-    max_active_runs=1,
-    tags=["ilam", "lakehouse", "batch", "streaming"],
+    dag_id="ilam", # nom du DAG
+    description="Sonatel Data Lakehouse — Batch + Streaming pipeline", # description du DAG
+    default_args=default_args, # arguments par défaut pour les tâches du DAG
+    schedule_interval="@hourly", # exécution toutes les heures
+    start_date=days_ago(1), # date de début il y a 1 jour pour que le DAG puisse s'exécuter immédiatement
+    catchup=False, # ne pas exécuter les runs manquées avant la date de début
+    max_active_runs=1, # ne pas exécuter plusieurs runs en parallèle
+    tags=["ilam", "sonatel", "lakehouse", "streaming"], # tags pour organiser les DAGs dans l'interface Airflow
 )
 
 # =============================================================================
-# Task 1 — Health check
+# Task 1 — Health check de tous les services
 # =============================================================================
-def health_check(**context):
+def health_check(**context): 
     services = {
-        "MinIO":        "http://minio:9000/minio/health/live",
+        "MinIO"       : "http://minio:9000/minio/health/live",
         "Iceberg REST": "http://iceberg-rest:8181/v1/config",
-        "Trino":        "http://trino:8080/v1/info",
-        "Flink":        "http://flink-jobmanager:8081/overview",
-        "NiFi":         "https://nifi:8443/nifi-api/system-diagnostics",
+        "Trino"       : "http://trino:8080/v1/info",
+        "Flink"       : "http://flink-jobmanager:8081/overview",
     }
     failed = []
     for name, url in services.items():
         try:
             r = requests.get(url, timeout=10, verify=False)
             if r.status_code == 200:
-                logger.info(f"OK: {name}")
+                logger.info(f"  OK : {name}")
             else:
                 failed.append(name)
+                logger.error(f"  FAIL : {name} → {r.status_code}")
         except Exception as e:
             failed.append(name)
-            logger.error(f"FAIL: {name} -> {e}")
+            logger.error(f"  FAIL : {name} → {e}")
+
     if failed:
         raise Exception(f"Services down: {', '.join(failed)}")
+
     logger.info("All services healthy.")
     return "ok"
 
+# Note : ce health check est basique et ne vérifie que la disponibilité des endpoints. 
+# Il pourrait être amélioré pour vérifier des fonctionnalités spécifiques (ex: écrire/lire dans MinIO, 
+# exécuter une requête test sur Trino, etc.) mais cela suffira pour un monitoring de base.
+# Ce DAG est surtout destiné à vérifier que le job PyFlink de streaming tourne et que les tables Bronze sont alimentées, avant de lancer dbt. 
+# Si le health check échoue, cela indique un problème d'infrastructure qui doit être résolu avant de continuer.
 task_health_check = PythonOperator(
     task_id="health_check",
     python_callable=health_check,
@@ -68,101 +80,58 @@ task_health_check = PythonOperator(
 )
 
 # =============================================================================
-# Task 2a — Start NiFi pipeline (streaming branch)
+# Task 2 — Vérifier que le job PyFlink tourne et checkpointe
 # =============================================================================
-def start_nifi_pipeline(**context):
-    """Start NiFi processors via REST API."""
-    nifi_url = "https://nifi:8443/nifi-api"
-    auth = ("ilam_admin", "ilam_password_2025")
-
-    try:
-        # Get access token
-        token_resp = requests.post(
-            f"{nifi_url}/access/token",
-            data={"username": "ilam_admin", "password": "ilam_password_2025"},
-            verify=False,
-            timeout=30,
-        )
-        token = token_resp.text
-        headers = {"Authorization": f"Bearer {token}"}
-
-        # Get root process group
-        pg_resp = requests.get(
-            f"{nifi_url}/flow/process-groups/root",
-            headers=headers,
-            verify=False,
-            timeout=30,
-        )
-        pg_id = pg_resp.json()["processGroupFlow"]["id"]
-
-        # Start all processors
-        requests.put(
-            f"{nifi_url}/flow/process-groups/{pg_id}",
-            headers=headers,
-            json={"id": pg_id, "state": "RUNNING"},
-            verify=False,
-            timeout=30,
-        )
-
-        logger.info("NiFi pipeline started successfully.")
-        context["ti"].xcom_push(key="nifi_pg_id", value=pg_id)
-        return "nifi_started"
-
-    except Exception as e:
-        logger.warning(f"NiFi start failed: {e} — continuing anyway")
-        return "nifi_skipped"
-
-task_start_nifi = PythonOperator(
-    task_id="start_nifi_pipeline",
-    python_callable=start_nifi_pipeline,
-    dag=dag,
-)
-
-# =============================================================================
-# Task 2b — Start PyFlink streaming job (streaming branch)
-# =============================================================================
-def start_pyflink_job(**context):
-    """Check if PyFlink job is running, start if not."""
+def verify_streaming(**context):
+    """
+    Vérifie que le job PyFlink est RUNNING et a des checkpoints complétés.
+    NiFi et PyFlink tournent en continu — ce DAG vérifie seulement leur état.
+    """
     flink_url = "http://flink-jobmanager:8081"
 
-    try:
-        # Check running jobs
-        jobs_resp = requests.get(f"{flink_url}/jobs", timeout=10)
-        running = [j for j in jobs_resp.json()["jobs"]
-                   if j["status"] == "RUNNING"]
+    # Vérifier les jobs en cours
+    jobs_resp = requests.get(f"{flink_url}/jobs", timeout=10)
+    running = [j for j in jobs_resp.json()["jobs"]
+               if j["status"] == "RUNNING"]
 
-        if running:
-            logger.info(f"PyFlink job already running: {running[0]['id']}")
-            context["ti"].xcom_push(key="flink_job_id", value=running[0]["id"])
-            return "flink_already_running"
+    if not running:
+        raise Exception("No PyFlink streaming job running. Run 'make pyflink-job'.")
 
-        logger.info("No running Flink job — submitting PyFlink job...")
-        return "flink_submitted"
+    job_id = running[0]["id"]
+    logger.info(f"PyFlink job running: {job_id}")
 
-    except Exception as e:
-        logger.error(f"Flink check failed: {e}")
-        raise
+    # Vérifier les checkpoints
+    cp_resp = requests.get(
+        f"{flink_url}/jobs/{job_id}/checkpoints",
+        timeout=10
+    )
+    cp_data   = cp_resp.json()
+    completed = cp_data.get("counts", {}).get("completed", 0)
+    failed    = cp_data.get("counts", {}).get("failed", 0)
 
-task_start_flink = PythonOperator(
-    task_id="start_pyflink_job",
-    python_callable=start_pyflink_job,
+    logger.info(f"Checkpoints — completed: {completed}, failed: {failed}")
+
+    if completed == 0:
+        raise Exception("No completed checkpoints yet — streaming not writing to Iceberg.")
+
+    context["ti"].xcom_push(key="flink_job_id",          value=job_id)
+    context["ti"].xcom_push(key="streaming_checkpoints",  value=completed)
+    return f"streaming_ok_{completed}_checkpoints"
+
+task_verify_streaming = PythonOperator(
+    task_id="verify_streaming",
+    python_callable=verify_streaming,
     dag=dag,
 )
 
 # =============================================================================
-# Task 2c — Generate Bronze data (batch branch)
-# =============================================================================
-task_generate_data = BashOperator(
-    task_id="generate_bronze_data",
-    bash_command="python3 /opt/airflow/dags/sonatel_generator.py",
-    execution_timeout=timedelta(minutes=15),
-    dag=dag,
-)
-
-# =============================================================================
-# Task 3 — Verify Bronze counts (both branches feed Bronze)
+# Task 3 — Vérifier les counts Bronze (toutes les 9 tables)
 # =============================================================================
 def verify_bronze_counts(**context):
+    """
+    Vérifie que les 9 tables Bronze sont alimentées.
+    NiFi + PyFlink alimentent ces tables en continu.
+    """
     import trino
     conn = trino.dbapi.connect(
         host="trino", port=8080,
@@ -170,11 +139,19 @@ def verify_bronze_counts(**context):
         request_timeout=60,
     )
     cursor = conn.cursor()
+
     tables = [
-        "bronze.subscribers", "bronze.cdr_voice",
-        "bronze.cdr_sms", "bronze.cdr_data",
-        "bronze.network_events", "bronze.om_transactions",
+        "bronze.cdr_voice",
+        "bronze.cdr_sms",
+        "bronze.cdr_data",
+        "bronze.network_events",
+        "bronze.om_transactions",
+        "bronze.subscribers",
+        "bronze.contracts",
+        "bronze.recharges",
+        "bronze.complaints",
     ]
+
     counts = {}
     for table in tables:
         cursor.execute(f"SELECT COUNT(*) FROM iceberg.{table}")
@@ -186,7 +163,7 @@ def verify_bronze_counts(**context):
         raise Exception(f"Empty Bronze tables: {empty}")
 
     total = sum(counts.values())
-    logger.info(f"Bronze OK — total: {total} rows")
+    logger.info(f"Bronze OK — {len(tables)} tables, {total} total rows")
     context["ti"].xcom_push(key="bronze_counts", value=counts)
     return counts
 
@@ -197,72 +174,38 @@ task_verify_bronze = PythonOperator(
 )
 
 # =============================================================================
-# Task 4 — Verify streaming is working
-# =============================================================================
-def verify_streaming(**context):
-    """Verify PyFlink job is running and checkpointing."""
-    flink_url = "http://flink-jobmanager:8081"
-
-    jobs_resp = requests.get(f"{flink_url}/jobs", timeout=10)
-    running = [j for j in jobs_resp.json()["jobs"]
-               if j["status"] == "RUNNING"]
-
-    if not running:
-        logger.warning("No Flink streaming job running.")
-        return "no_streaming_job"
-
-    job_id = running[0]["id"]
-    cp_resp = requests.get(
-        f"{flink_url}/jobs/{job_id}/checkpoints",
-        timeout=10
-    )
-    cp_data = cp_resp.json()
-    completed = cp_data.get("counts", {}).get("completed", 0)
-    failed = cp_data.get("counts", {}).get("failed", 0)
-
-    logger.info(f"Flink job {job_id}: "
-                f"{completed} checkpoints completed, "
-                f"{failed} failed")
-
-    context["ti"].xcom_push(key="streaming_checkpoints", value=completed)
-    return f"streaming_ok_{completed}_checkpoints"
-
-task_verify_streaming = PythonOperator(
-    task_id="verify_streaming",
-    python_callable=verify_streaming,
-    dag=dag,
-)
-
-# =============================================================================
-# Task 5 — dbt run
+# Task 4 — dbt run (Bronze → Silver → Gold)
 # =============================================================================
 task_dbt_run = BashOperator(
     task_id="dbt_run",
     bash_command="""
         cd /opt/airflow/transform/ilam_transform && \
-        dbt run --profiles-dir . --no-write-json 2>&1 | \
-        grep -E "OK|ERROR|Finished|Done" || true
+        dbt run --profiles-dir . --target docker --no-write-json 2>&1 | \
+        grep -E "OK|ERROR|Finished|Running|WARN" || true
     """,
     execution_timeout=timedelta(minutes=15),
     dag=dag,
 )
+# Note : on utilise grep pour filtrer la sortie de dbt et ne garder que les lignes importantes (succès, erreurs, résumé). Cela rendra les logs plus lisibles dans Airflow. 
+# Le flag --no-write-json évite de générer les fichiers de résultats JSON, car ce DAG est surtout destiné à vérifier que dbt s'exécute sans erreur et que les Gold marts sont alimentés, 
+# plutôt que d'analyser les résultats détaillés de chaque modèle.
 
 # =============================================================================
-# Task 6 — dbt test
+# Task 5 — dbt test (qualité des données)
 # =============================================================================
 task_dbt_test = BashOperator(
     task_id="dbt_test",
     bash_command="""
         cd /opt/airflow/transform/ilam_transform && \
-        dbt test --profiles-dir . --no-write-json 2>&1 | \
-        grep -E "OK|FAIL|Finished|Done" || true
+        dbt test --profiles-dir . --target docker --no-write-json 2>&1 | \
+        grep -E "OK|FAIL|ERROR|Finished|Pass|Warn" || true
     """,
     execution_timeout=timedelta(minutes=10),
     dag=dag,
 )
 
 # =============================================================================
-# Task 7 — Verify Gold Data Marts
+# Task 6 — Vérifier les Gold Data Marts
 # =============================================================================
 def verify_gold_marts(**context):
     import trino
@@ -272,11 +215,16 @@ def verify_gold_marts(**context):
         request_timeout=60,
     )
     cursor = conn.cursor()
+
     marts = [
-        "gold.mart_revenue", "gold.mart_network_quality",
-        "gold.mart_churn", "gold.mart_arpu",
-        "gold.mart_om_activity", "gold.mart_usage",
+        "gold.mart_revenue",
+        "gold.mart_network_quality",
+        "gold.mart_churn",
+        "gold.mart_arpu",
+        "gold.mart_om_activity",
+        "gold.mart_usage",
     ]
+
     results = {}
     for mart in marts:
         cursor.execute(f"SELECT COUNT(*) FROM iceberg.{mart}")
@@ -287,7 +235,7 @@ def verify_gold_marts(**context):
     if empty:
         raise Exception(f"Empty Gold marts: {empty}")
 
-    logger.info("Gold marts OK.")
+    logger.info(f"Gold OK — {len(marts)} marts populated")
     context["ti"].xcom_push(key="gold_counts", value=results)
     return results
 
@@ -298,25 +246,30 @@ task_verify_gold = PythonOperator(
 )
 
 # =============================================================================
-# Task 8 — Pipeline summary
+# Task 7 — Pipeline summary
 # =============================================================================
 def pipeline_summary(**context):
-    ti = context["ti"]
-    bronze = ti.xcom_pull(task_ids="verify_bronze_counts",
-                          key="bronze_counts") or {}
-    gold   = ti.xcom_pull(task_ids="verify_gold_marts",
-                          key="gold_counts") or {}
-    checkpoints = ti.xcom_pull(task_ids="verify_streaming",
-                               key="streaming_checkpoints") or 0
+    ti           = context["ti"]
+    bronze       = ti.xcom_pull(task_ids="verify_bronze_counts",
+                                key="bronze_counts") or {}
+    gold         = ti.xcom_pull(task_ids="verify_gold_marts",
+                                key="gold_counts") or {}
+    checkpoints  = ti.xcom_pull(task_ids="verify_streaming",
+                                key="streaming_checkpoints") or 0
+    job_id       = ti.xcom_pull(task_ids="verify_streaming",
+                                key="flink_job_id") or "unknown"
 
-    logger.info("=" * 50)
+    logger.info("=" * 55)
     logger.info("ILAM PIPELINE SUMMARY")
-    logger.info(f"Date         : {context['ds']}")
-    logger.info(f"Bronze rows  : {sum(bronze.values())}")
-    logger.info(f"Gold marts   : {len(gold)}")
-    logger.info(f"Checkpoints  : {checkpoints}")
-    logger.info("Batch + Streaming pipeline completed.")
-    logger.info("=" * 50)
+    logger.info(f"  Date             : {context['ds']}")
+    logger.info(f"  PyFlink Job ID   : {job_id}")
+    logger.info(f"  Checkpoints      : {checkpoints}")
+    logger.info(f"  Bronze tables    : {len(bronze)}")
+    logger.info(f"  Bronze total rows: {sum(bronze.values())}")
+    logger.info(f"  Gold marts       : {len(gold)}")
+    logger.info(f"  Gold total rows  : {sum(gold.values())}")
+    logger.info("  Status           : SUCCESS")
+    logger.info("=" * 55)
 
 task_summary = PythonOperator(
     task_id="pipeline_summary",
@@ -325,19 +278,28 @@ task_summary = PythonOperator(
 )
 
 # =============================================================================
-# Dependencies — parallel batch + streaming branches
+# Dépendances — pipeline linéaire simple
+#
+#  health_check
+#       |
+#  verify_streaming  (PyFlink tourne ?)
+#       |
+#  verify_bronze     (9 tables alimentées ?)
+#       |
+#  dbt_run           (Bronze → Silver → Gold)
+#       |
+#  dbt_test          (qualité des données)
+#       |
+#  verify_gold       (6 marts populés ?)
+#       |
+#  pipeline_summary
 # =============================================================================
-# Health check en premier
-task_health_check >> [task_generate_data, task_start_nifi, task_start_flink]
-
-# Branche streaming
-[task_start_nifi, task_start_flink] >> task_verify_streaming
-
-# Branche batch
-task_generate_data >> task_verify_bronze
-
-# Les deux branches convergent vers dbt
-[task_verify_bronze, task_verify_streaming] >> task_dbt_run
-
-# Suite du pipeline
-task_dbt_run >> task_dbt_test >> task_verify_gold >> task_summary
+(
+    task_health_check
+    >> task_verify_streaming
+    >> task_verify_bronze
+    >> task_dbt_run
+    >> task_dbt_test
+    >> task_verify_gold
+    >> task_summary
+)

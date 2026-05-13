@@ -320,7 +320,7 @@ deploy-dags:
 airflow-trigger:
 	@echo "$(CYAN)Triggering Airflow pipeline...$(RESET)"
 	docker exec ilam-airflow-scheduler \
-	  airflow dags trigger ilam_sonatel_pipeline 2>/dev/null
+	  airflow dags trigger ilam 2>/dev/null
 	@echo "$(GREEN)Pipeline triggered. Monitor at http://localhost:8082$(RESET)"
 
 # Voir l'état des 5 derniers runs
@@ -328,7 +328,7 @@ airflow-status:
 	@echo "$(CYAN)Last DAG runs:$(RESET)"
 	docker exec ilam-airflow-scheduler \
 	  airflow dags list-runs \
-	  -d ilam_sonatel_pipeline 2>/dev/null | tail -5
+	  -d ilam 2>/dev/null | tail -5
 
 # Suivre les logs du scheduler en filtrant les infos pertinentes
 airflow-logs:
@@ -339,13 +339,13 @@ airflow-logs:
 # Mettre en pause le DAG (arrête les runs planifiés)
 airflow-pause:
 	docker exec ilam-airflow-scheduler \
-	  airflow dags pause ilam_sonatel_pipeline 2>/dev/null
+	  airflow dags pause ilam 2>/dev/null
 	@echo "$(GREEN)DAG paused.$(RESET)"
 
 # Reprendre le DAG après une pause
 airflow-unpause:
 	docker exec ilam-airflow-scheduler \
-	  airflow dags unpause ilam_sonatel_pipeline 2>/dev/null
+	  airflow dags unpause ilam 2>/dev/null
 	@echo "$(GREEN)DAG unpaused.$(RESET)"
 
 # Redémarrer les services Airflow
