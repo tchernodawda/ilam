@@ -369,3 +369,80 @@ download-flink-jars:
 	wget -q -O infra/flink/jars/bundle-2.20.18.jar \
 	  "https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.20.18/bundle-2.20.18.jar"
 	@echo "$(GREEN)JARs downloaded to infra/flink/jars/$(RESET)"
+
+# =============================================================================
+# SPARK
+# =============================================================================
+
+# Soumettre un job Spark spécifique (bronze|silver|gold|all)
+spark-job:
+	@echo "$(CYAN)Submitting Spark job: $(filter-out $@,$(MAKECMDGOALS))$(RESET)"
+	bash processing/spark/submit_spark_jobs.sh \
+	  $(filter-out $@,$(MAKECMDGOALS))
+
+# Statut du cluster Spark
+spark-status:
+	@echo "$(CYAN)Spark cluster status:$(RESET)"
+	@curl -s http://localhost:8090/json/ 2>/dev/null | \
+	  python3 -c "import sys,json; d=json.load(sys.stdin); \
+	  print('  Workers   :', len(d.get('workers', []))); \
+	  print('  Apps      :', len(d.get('activeapps', []))); \
+	  print('  Cores     :', d.get('cores', 0)); \
+	  print('  Memory    :', d.get('memory', 0), 'MB')" 2>/dev/null
+
+%:
+	@:
+
+# Télécharger les JARs Spark (Iceberg + AWS SDK + Hadoop)
+# À exécuter une seule fois après le clone
+download-spark-jars:
+	@echo "$(CYAN)Downloading Spark JARs...$(RESET)"
+	@mkdir -p infra/spark/jars
+	wget -q -O infra/spark/jars/iceberg-spark-runtime-3.5_2.12-1.5.2.jar \
+	  "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.5.2/iceberg-spark-runtime-3.5_2.12-1.5.2.jar"
+	wget -q -O infra/spark/jars/bundle-2.20.18.jar \
+	  "https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.20.18/bundle-2.20.18.jar"
+	wget -q -O infra/spark/jars/hadoop-aws-3.3.4.jar \
+	  "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar"
+	@echo "$(GREEN)Spark JARs downloaded to infra/spark/jars/$(RESET)"
+	@echo "$(CYAN)Copying JARs to Spark containers...$(RESET)"
+	docker cp infra/spark/jars/iceberg-spark-runtime-3.5_2.12-1.5.2.jar \
+	  ilam-spark-master:/opt/spark/jars/
+	docker cp infra/spark/jars/bundle-2.20.18.jar \
+	  ilam-spark-master:/opt/spark/jars/
+	docker cp infra/spark/jars/hadoop-aws-3.3.4.jar \
+	  ilam-spark-master:/opt/spark/jars/
+	docker cp infra/spark/jars/iceberg-spark-runtime-3.5_2.12-1.5.2.jar \
+	  ilam-spark-worker:/opt/spark/jars/
+	docker cp infra/spark/jars/bundle-2.20.18.jar \
+	  ilam-spark-worker:/opt/spark/jars/
+	docker cp infra/spark/jars/hadoop-aws-3.3.4.jar \
+	  ilam-spark-worker:/opt/spark/jars/
+	@echo "$(GREEN)JARs copied to Spark Master and Worker.$(RESET)"
+
+# Télécharger les JARs Spark (Iceberg + AWS SDK + Hadoop)
+# À exécuter une seule fois après le clone
+download-spark-jars:
+	@echo "$(CYAN)Downloading Spark JARs...$(RESET)"
+	@mkdir -p infra/spark/jars
+	wget -q -O infra/spark/jars/iceberg-spark-runtime-3.5_2.12-1.5.2.jar \
+	  "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.5.2/iceberg-spark-runtime-3.5_2.12-1.5.2.jar"
+	wget -q -O infra/spark/jars/bundle-2.20.18.jar \
+	  "https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.20.18/bundle-2.20.18.jar"
+	wget -q -O infra/spark/jars/hadoop-aws-3.3.4.jar \
+	  "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar"
+	@echo "$(GREEN)Spark JARs downloaded to infra/spark/jars/$(RESET)"
+	@echo "$(CYAN)Copying JARs to Spark containers...$(RESET)"
+	docker cp infra/spark/jars/iceberg-spark-runtime-3.5_2.12-1.5.2.jar \
+	  ilam-spark-master:/opt/spark/jars/
+	docker cp infra/spark/jars/bundle-2.20.18.jar \
+	  ilam-spark-master:/opt/spark/jars/
+	docker cp infra/spark/jars/hadoop-aws-3.3.4.jar \
+	  ilam-spark-master:/opt/spark/jars/
+	docker cp infra/spark/jars/iceberg-spark-runtime-3.5_2.12-1.5.2.jar \
+	  ilam-spark-worker:/opt/spark/jars/
+	docker cp infra/spark/jars/bundle-2.20.18.jar \
+	  ilam-spark-worker:/opt/spark/jars/
+	docker cp infra/spark/jars/hadoop-aws-3.3.4.jar \
+	  ilam-spark-worker:/opt/spark/jars/
+	@echo "$(GREEN)JARs copied to Spark Master and Worker.$(RESET)"

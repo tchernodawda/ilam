@@ -108,7 +108,10 @@ pip install -r requirements.txt
 # 3. Start and initialize (first time only)
 make setup
 
-# 4. Run transformations
+# 4. Download Spark JARs (first time only)
+make download-spark-jars
+
+# 5. Run transformations
 make dbt-run && make dbt-test
 
 # 5. Deploy and trigger Airflow pipeline

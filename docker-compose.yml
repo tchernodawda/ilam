@@ -382,6 +382,47 @@ services:
     networks:
       - ilam-net
 
+  spark-master:
+    image: apache/spark:3.5.0
+    container_name: ilam-spark-master
+    user: root
+    environment:
+      - AWS_ACCESS_KEY_ID=ilam_admin
+      - AWS_SECRET_ACCESS_KEY=ilam_password_2025
+      - AWS_REGION=us-east-1
+    ports:
+      - "8090:8080"
+      - "7077:7077"
+    command: >
+      bash -c "/opt/spark/bin/spark-class
+      org.apache.spark.deploy.master.Master
+      --host spark-master
+      --port 7077
+      --webui-port 8080"
+    networks:
+      - ilam-net
+    restart: unless-stopped
+
+  spark-worker:
+    image: apache/spark:3.5.0
+    container_name: ilam-spark-worker
+    user: root
+    environment:
+      - AWS_ACCESS_KEY_ID=ilam_admin
+      - AWS_SECRET_ACCESS_KEY=ilam_password_2025
+      - AWS_REGION=us-east-1
+    depends_on:
+      - spark-master
+    command: >
+      bash -c "/opt/spark/bin/spark-class
+      org.apache.spark.deploy.worker.Worker
+      --memory 1g
+      --cores 2
+      spark://spark-master:7077"
+    networks:
+      - ilam-net
+    restart: unless-stopped
+
   prometheus:
     image: prom/prometheus:latest
     container_name: ilam-prometheus
@@ -442,3 +483,8 @@ volumes:
     name: ilam-iceberg-catalog-db
   kafka_data:
     name: ilam-kafka-data
+  spark_master_data:
+    name: ilam-spark-master-data
+  spark_worker_data:
+    name: ilam-spark-worker-data    
+ 

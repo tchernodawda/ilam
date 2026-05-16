@@ -1,49 +1,27 @@
-# Environment
-.env
-*.env.local
-
 # Python
-__pycache__/
-*.py[cod]
-*.egg-info/
 .venv/
-venv/
-dist/
-build/
-*.egg
+__pycache__/
+*.pyc
+*.pyo
 .pytest_cache/
-.mypy_cache/
-.ruff_cache/
 
 # dbt
-transform/target/
-transform/dbt_packages/
-transform/logs/
-transform/.user.yml
+transform/ilam_transform/target/
+transform/ilam_transform/logs/
+transform/ilam_transform/dbt_packages/
 
-# Airflow
-orchestration/logs/
-orchestration/plugins/__pycache__/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-.DS_Store
-
-# Secrets
-*.pem
-*.key
-*.crt
-secrets/
-
-# Data files
-*.parquet
-*.avro
-*.orc
-*.csv
-data/
-
-# Flink JARs — trop volumineux pour GitHub (>100MB)
+# JARs (trop volumineux — utiliser make download-flink-jars / download-spark-jars)
 infra/flink/jars/*.jar
+infra/spark/jars/*.jar
+
+# Environnement
+.env
+*.env
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
