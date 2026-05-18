@@ -10,19 +10,12 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
+  - job_name: ilam_exporter
+    static_configs:
+      - targets: ["ilam-exporter:8089"]
+    metrics_path: /metrics
+
   - job_name: minio
     metrics_path: /minio/v2/metrics/cluster
     static_configs:
       - targets: ["minio:9000"]
-
-  - job_name: trino
-    static_configs:
-      - targets: ["trino:8080"]
-
-  - job_name: flink
-    static_configs:
-      - targets: ["flink-jobmanager:8081"]
-
-  - job_name: airflow
-    static_configs:
-      - targets: ["airflow-webserver:8080"]

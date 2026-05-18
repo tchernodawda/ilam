@@ -419,3 +419,28 @@ download-spark-jars:
 	docker cp infra/spark/jars/hadoop-aws-3.3.4.jar \
 	  ilam-spark-worker:/opt/spark/jars/
 	@echo "$(GREEN)JARs copied to Spark Master and Worker.$(RESET)"
+
+# Ouvrir Grafana dans le navigateur
+grafana:
+	@echo "$(CYAN)Grafana disponible sur http://localhost:3000$(RESET)"
+	@echo "  Login : admin / ilam_password_2025"
+	@echo "  Dashboards :"
+	@echo "    → ILAM — Vue d'ensemble plateforme"
+	@echo "    → ILAM — Pipeline Streaming"
+	@echo "    → ILAM — Métriques Business Sonatel"
+
+# Vérifier les métriques Prometheus
+metrics-check:
+	@echo "$(CYAN)Métriques ILAM disponibles :$(RESET)"
+	@curl -s "http://localhost:9090/api/v1/query?query=ilam_iceberg_table_rows" | \
+	  python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+results = data['data']['result']
+print(f'  Tables monitorées : {len(results)}')
+for r in sorted(results, key=lambda x: x['metric'].get('schema','')):
+    schema = r['metric'].get('schema','?')
+    table  = r['metric'].get('table','?')
+    value  = r['value'][1]
+    print(f'  {schema}.{table:<25} : {value} rows')
+" 2>/dev/null

@@ -447,6 +447,22 @@ services:
     networks:
       - ilam-net
 
+  ilam-exporter:
+    image: python:3.11-slim
+    container_name: ilam-exporter
+    restart: unless-stopped
+    command: >
+      bash -c "pip install prometheus-client requests trino -q &&
+               python3 /app/ilam_exporter.py"
+    volumes:
+      - ./infra/monitoring/ilam_exporter.py:/app/ilam_exporter.py
+    ports:
+      - "8089:8089"
+    networks:
+      - ilam-net
+    depends_on:
+      - trino
+      - flink-jobmanager
   grafana:
     image: grafana/grafana:latest
     container_name: ilam-grafana
