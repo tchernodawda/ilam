@@ -320,7 +320,7 @@ deploy-dags:
 airflow-trigger:
 	@echo "$(CYAN)Triggering Airflow pipeline...$(RESET)"
 	docker exec ilam-airflow-scheduler \
-	  airflow dags trigger ilam 2>/dev/null
+	  airflow dags trigger ilam_sonatel_pipeline 2>/dev/null
 	@echo "$(GREEN)Pipeline triggered. Monitor at http://localhost:8082$(RESET)"
 
 # Voir l'état des 5 derniers runs
@@ -392,33 +392,6 @@ spark-status:
 
 %:
 	@:
-
-# Télécharger les JARs Spark (Iceberg + AWS SDK + Hadoop)
-# À exécuter une seule fois après le clone
-download-spark-jars:
-	@echo "$(CYAN)Downloading Spark JARs...$(RESET)"
-	@mkdir -p infra/spark/jars
-	wget -q -O infra/spark/jars/iceberg-spark-runtime-3.5_2.12-1.5.2.jar \
-	  "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.5.2/iceberg-spark-runtime-3.5_2.12-1.5.2.jar"
-	wget -q -O infra/spark/jars/bundle-2.20.18.jar \
-	  "https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/2.20.18/bundle-2.20.18.jar"
-	wget -q -O infra/spark/jars/hadoop-aws-3.3.4.jar \
-	  "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar"
-	@echo "$(GREEN)Spark JARs downloaded to infra/spark/jars/$(RESET)"
-	@echo "$(CYAN)Copying JARs to Spark containers...$(RESET)"
-	docker cp infra/spark/jars/iceberg-spark-runtime-3.5_2.12-1.5.2.jar \
-	  ilam-spark-master:/opt/spark/jars/
-	docker cp infra/spark/jars/bundle-2.20.18.jar \
-	  ilam-spark-master:/opt/spark/jars/
-	docker cp infra/spark/jars/hadoop-aws-3.3.4.jar \
-	  ilam-spark-master:/opt/spark/jars/
-	docker cp infra/spark/jars/iceberg-spark-runtime-3.5_2.12-1.5.2.jar \
-	  ilam-spark-worker:/opt/spark/jars/
-	docker cp infra/spark/jars/bundle-2.20.18.jar \
-	  ilam-spark-worker:/opt/spark/jars/
-	docker cp infra/spark/jars/hadoop-aws-3.3.4.jar \
-	  ilam-spark-worker:/opt/spark/jars/
-	@echo "$(GREEN)JARs copied to Spark Master and Worker.$(RESET)"
 
 # Télécharger les JARs Spark (Iceberg + AWS SDK + Hadoop)
 # À exécuter une seule fois après le clone

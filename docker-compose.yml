@@ -6,6 +6,7 @@ x-airflow-env: &airflow-env
   AIRFLOW__CORE__LOAD_EXAMPLES: "false"
   AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
   AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+  _PIP_ADDITIONAL_REQUIREMENTS: "trino==0.328.0 great-expectations==0.18.19"
   MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
   MINIO_ROOT_USER: ${MINIO_ROOT_USER:-ilam_admin}
   MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-ilam_password_2025}
@@ -356,6 +357,9 @@ services:
       <<: *airflow-env
     volumes:
       - airflow_logs:/opt/airflow/logs
+      - ./orchestration/dags:/opt/airflow/dags
+      - ./transform:/opt/airflow/transform
+      - ./quality:/opt/airflow/quality
     ports:
       - "${AIRFLOW_PORT:-8082}:8080"
     command: webserver
@@ -378,6 +382,9 @@ services:
       <<: *airflow-env
     volumes:
       - airflow_logs:/opt/airflow/logs
+      - ./orchestration/dags:/opt/airflow/dags
+      - ./transform:/opt/airflow/transform
+      - ./quality:/opt/airflow/quality
     command: scheduler
     networks:
       - ilam-net

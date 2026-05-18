@@ -1,0 +1,39 @@
+{
+  "run_date": "2026-05-18T14:50:17.874194",
+  "global_score": 100.0,
+  "global_status": "PASS",
+  "tables": [
+    {
+      "suite": "bronze.cdr_voice",
+      "total": 8,
+      "success": 8,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    },
+    {
+      "suite": "bronze.subscribers",
+      "total": 6,
+      "success": 6,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    },
+    {
+      "suite": "bronze.om_transactions",
+      "total": 7,
+      "success": 7,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    }
+  ],
+  "summary": {
+    "total_expectations": 21,
+    "total_success": 21,
+    "total_failed": 0
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "run_date": "2026-05-18T08:33:46.404428",
+  "global_score": 95.2,
+  "global_status": "PASS",
+  "tables": [
+    {
+      "suite": "bronze.cdr_voice",
+      "total": 8,
+      "success": 8,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    },
+    {
+      "suite": "bronze.subscribers",
+      "total": 6,
+      "success": 6,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    },
+    {
+      "suite": "bronze.om_transactions",
+      "total": 7,
+      "success": 6,
+      "failed": 1,
+      "score": 85.7,
+      "status": "PASS",
+      "failed_expectations": [
+        {
+          "expectation": "expect_column_values_to_be_in_set",
+          "column": "transaction_type",
+          "details": "{'element_count': 4837, 'unexpected_count': 800, 'unexpected_percent': 16.539177175935496, 'partial_unexpected_list': ['PAIEMENT', 'RETRAIT', 'TRANSFERT', 'DEPOT', 'ACHAT_CREDIT', 'FACTURE', 'FACTURE'"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_expectations": 21,
+    "total_success": 20,
+    "total_failed": 1
+  }
+}

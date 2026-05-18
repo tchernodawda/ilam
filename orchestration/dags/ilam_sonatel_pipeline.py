@@ -5,10 +5,24 @@ Orchestrates batch + streaming pipelines.
 Architecture :
   Streaming : NiFi → Kafka → PyFlink → Bronze (continu, auto-géré)
   Batch     : NiFi CRON → Kafka → PyFlink → Bronze (hourly, auto-géré)
-  Ce DAG    : vérifie l'état du streaming, lance dbt, vérifie Gold
+  Ce DAG    : vérifie streaming → qualité → dbt → gold
 
-Alerting   : Slack-style callbacks (simulated — replace webhook_url
-             with real Slack URL in production)
+Pipeline :
+  health_check
+       ↓
+  verify_streaming
+       ↓
+  verify_bronze_counts
+       ↓
+  verify_data_quality   ← NEW (Great Expectations)
+       ↓
+  dbt_run
+       ↓
+  dbt_test
+       ↓
+  verify_gold_marts
+       ↓
+  pipeline_summary
 """
 
 from datetime import datetime, timedelta
@@ -23,114 +37,83 @@ import requests
 logger = logging.getLogger(__name__)
 
 # =============================================================================
-# Configuration alertes Slack (simulé)
-# En production : remplacer par le vrai webhook Slack
-# SLACK_WEBHOOK_URL = "https://hooks.slack.com/services/xxx/yyy/zzz"
+# Alertes Slack simulées
 # =============================================================================
-SLACK_WEBHOOK_URL = None  # None = simulation, log uniquement
+SLACK_WEBHOOK_URL = None
 SLACK_CHANNEL     = "#ilam-data-alerts"
 SLACK_USERNAME    = "ILAM Bot"
 
 def send_slack_alert(payload: dict, level: str = "error"):
-    """
-    Envoie une alerte Slack ou la simule si webhook non configuré.
-    En production, décommenter SLACK_WEBHOOK_URL ci-dessus.
-    """
-    emoji   = "🔴" if level == "error" else "⚠️" if level == "warning" else "✅"
-    message = {
-        "channel"   : SLACK_CHANNEL,
-        "username"  : SLACK_USERNAME,
-        "icon_emoji": ":robot_face:",
-        "attachments": [{
-            "color": "#FF0000" if level == "error" else
-                     "#FFA500" if level == "warning" else "#36A64F",
-            "title": f"{emoji} ILAM Pipeline Alert",
-            "fields": [
-                {"title": k, "value": str(v), "short": True}
-                for k, v in payload.items()
-            ],
-            "footer"   : "ILAM — Sonatel Data Lakehouse",
-            "ts"       : datetime.utcnow().timestamp(),
-        }]
-    }
-
+    emoji   = "🔴" if level == "error" else \
+              "⚠️" if level == "warning" else "✅"
     if SLACK_WEBHOOK_URL:
-        # Production — vrai Slack
         try:
-            resp = requests.post(
+            requests.post(
                 SLACK_WEBHOOK_URL,
-                data=json.dumps(message),
+                data=json.dumps({
+                    "channel"    : SLACK_CHANNEL,
+                    "username"   : SLACK_USERNAME,
+                    "attachments": [{
+                        "color": "#FF0000" if level == "error" else
+                                 "#FFA500" if level == "warning"
+                                 else "#36A64F",
+                        "title": f"{emoji} ILAM Pipeline Alert",
+                        "fields": [
+                            {"title": k, "value": str(v), "short": True}
+                            for k, v in payload.items()
+                        ],
+                    }]
+                }),
                 headers={"Content-Type": "application/json"},
                 timeout=10,
             )
-            logger.info(f"Slack alert sent: {resp.status_code}")
         except Exception as e:
             logger.error(f"Slack alert failed: {e}")
     else:
-        # Simulation — log structuré comme Slack
         logger.warning("=" * 60)
-        logger.warning(f"[SLACK ALERT SIMULATION] {SLACK_CHANNEL}")
-        logger.warning(f"  Level   : {level.upper()}")
+        logger.warning(f"[SLACK ALERT] {SLACK_CHANNEL} | {level.upper()}")
         for k, v in payload.items():
             logger.warning(f"  {k:<20}: {v}")
         logger.warning("=" * 60)
 
 # =============================================================================
-# Callbacks — appelés automatiquement par Airflow sur échec/retry/SLA
+# Callbacks
 # =============================================================================
-
 def on_failure_callback(context):
-    """Callback appelé automatiquement quand une task échoue."""
-    task_id    = context["task_instance"].task_id
-    dag_id     = context["task_instance"].dag_id
-    exec_date  = context["execution_date"]
-    exception  = context.get("exception", "Unknown error")
-    try_number = context["task_instance"].try_number
-
     send_slack_alert({
-        "DAG"        : dag_id,
-        "Task"       : task_id,
-        "Execution"  : str(exec_date),
-        "Attempt"    : f"{try_number}/2",
-        "Error"      : str(exception)[:200],
-        "Logs"       : f"http://localhost:8082/log?dag_id={dag_id}&task_id={task_id}",
+        "DAG"      : context["task_instance"].dag_id,
+        "Task"     : context["task_instance"].task_id,
+        "Execution": str(context["execution_date"]),
+        "Attempt"  : f"{context['task_instance'].try_number}/2",
+        "Error"    : str(context.get("exception", "Unknown"))[:200],
     }, level="error")
 
 def on_retry_callback(context):
-    """Callback appelé automatiquement quand une task est en retry."""
-    task_id   = context["task_instance"].task_id
-    try_number = context["task_instance"].try_number
-
     send_slack_alert({
         "DAG"    : context["task_instance"].dag_id,
-        "Task"   : task_id,
-        "Attempt": f"{try_number}/2",
+        "Task"   : context["task_instance"].task_id,
+        "Attempt": f"{context['task_instance'].try_number}/2",
         "Status" : "Retrying after failure...",
     }, level="warning")
 
 def on_success_callback(context):
-    """Callback appelé sur succès — uniquement pour pipeline_summary."""
-    ti     = context["task_instance"]
-    dag_id = ti.dag_id
-
     send_slack_alert({
-        "DAG"    : dag_id,
-        "Status" : "Pipeline completed successfully",
-        "Date"   : str(context["execution_date"]),
+        "DAG"   : context["task_instance"].dag_id,
+        "Status": "Pipeline completed successfully",
+        "Date"  : str(context["execution_date"]),
     }, level="success")
 
-def sla_miss_callback(dag, task_list, blocking_task_list, slas, blocking_tis):
-    """Callback appelé quand une task dépasse son SLA."""
-    missed_tasks = [str(t) for t in task_list]
+def sla_miss_callback(dag, task_list, blocking_task_list,
+                      slas, blocking_tis):
     send_slack_alert({
-        "DAG"         : dag.dag_id,
-        "Status"      : "SLA MISSED",
-        "Tasks"       : ", ".join(missed_tasks),
-        "Description" : "Tasks exceeded their maximum allowed duration",
+        "DAG"        : dag.dag_id,
+        "Status"     : "SLA MISSED",
+        "Tasks"      : ", ".join([str(t) for t in task_list]),
+        "Description": "Tasks exceeded maximum allowed duration",
     }, level="warning")
 
 # =============================================================================
-# Default args avec callbacks
+# Default args
 # =============================================================================
 default_args = {
     "owner"              : "ilam",
@@ -177,10 +160,8 @@ def health_check(**context):
         except Exception as e:
             failed.append(name)
             logger.error(f"  FAIL : {name} -> {e}")
-
     if failed:
         raise Exception(f"Services down: {', '.join(failed)}")
-
     logger.info("All services healthy.")
     return "ok"
 
@@ -195,44 +176,32 @@ task_health_check = PythonOperator(
 # =============================================================================
 def verify_streaming(**context):
     flink_url = "http://flink-jobmanager:8081"
-
     jobs_resp = requests.get(f"{flink_url}/jobs", timeout=10)
     running   = [j for j in jobs_resp.json()["jobs"]
                  if j["status"] == "RUNNING"]
-
     if not running:
         raise Exception(
             "No PyFlink streaming job running. "
             "Run 'make pyflink-job' to restart."
         )
-
-    job_id = running[0]["id"]
-    logger.info(f"PyFlink job running: {job_id}")
-
+    job_id    = running[0]["id"]
     cp_resp   = requests.get(
         f"{flink_url}/jobs/{job_id}/checkpoints", timeout=10)
     cp_data   = cp_resp.json()
     completed = cp_data.get("counts", {}).get("completed", 0)
-    failed_cp = cp_data.get("counts", {}).get("failed", 0)
-
-    logger.info(f"Checkpoints — completed: {completed}, failed: {failed_cp}")
-
+    failed_cp = cp_data.get("counts", {}).get("failed",    0)
+    logger.info(f"PyFlink job {job_id} — "
+                f"checkpoints: {completed} OK, {failed_cp} failed")
     if completed == 0:
-        raise Exception(
-            "No completed checkpoints — "
-            "streaming not writing to Iceberg yet."
-        )
-
+        raise Exception("No completed checkpoints yet.")
     if failed_cp > completed:
         send_slack_alert({
             "Job ID"            : job_id,
             "Checkpoints OK"    : completed,
             "Checkpoints FAILED": failed_cp,
-            "Warning"           : "More failed than completed checkpoints",
         }, level="warning")
-
-    context["ti"].xcom_push(key="flink_job_id",         value=job_id)
-    context["ti"].xcom_push(key="streaming_checkpoints", value=completed)
+    context["ti"].xcom_push(key="flink_job_id",          value=job_id)
+    context["ti"].xcom_push(key="streaming_checkpoints",  value=completed)
     return f"streaming_ok_{completed}_checkpoints"
 
 task_verify_streaming = PythonOperator(
@@ -254,26 +223,16 @@ def verify_bronze_counts(**context):
     )
     cursor = conn.cursor()
 
-    # Tables streaming — doivent toujours avoir des données
     streaming_tables = [
-        "bronze.cdr_voice",
-        "bronze.cdr_sms",
-        "bronze.cdr_data",
-        "bronze.network_events",
-        "bronze.om_transactions",
+        "bronze.cdr_voice", "bronze.cdr_sms", "bronze.cdr_data",
+        "bronze.network_events", "bronze.om_transactions",
     ]
-
-    # Tables batch — peuvent être vides si CRON pas encore déclenché
     batch_tables = [
-        "bronze.subscribers",
-        "bronze.contracts",
-        "bronze.recharges",
-        "bronze.complaints",
+        "bronze.subscribers", "bronze.contracts",
+        "bronze.recharges", "bronze.complaints",
     ]
 
     counts = {}
-
-    # Vérification stricte pour les tables streaming
     streaming_empty = []
     for table in streaming_tables:
         cursor.execute(f"SELECT COUNT(*) FROM iceberg.{table}")
@@ -284,11 +243,8 @@ def verify_bronze_counts(**context):
 
     if streaming_empty:
         raise Exception(
-            f"Empty streaming Bronze tables: {streaming_empty}. "
-            f"Check NiFi pipelines and PyFlink job."
-        )
+            f"Empty streaming Bronze tables: {streaming_empty}")
 
-    # Vérification souple pour les tables batch
     batch_empty = []
     for table in batch_tables:
         cursor.execute(f"SELECT COUNT(*) FROM iceberg.{table}")
@@ -298,16 +254,10 @@ def verify_bronze_counts(**context):
             batch_empty.append(table)
 
     if batch_empty:
-        # Warning seulement — le CRON batch n'a peut-être pas encore tourné
-        logger.warning(
-            f"Empty batch tables (CRON may not have fired yet): "
-            f"{batch_empty}"
-        )
         send_slack_alert({
-            "Warning"      : "Empty batch Bronze tables",
-            "Tables"       : ", ".join(batch_empty),
-            "Explanation"  : "NiFi CRON batch may not have fired yet",
-            "Action"       : "Check NiFi batch pipelines",
+            "Warning"    : "Empty batch Bronze tables",
+            "Tables"     : ", ".join(batch_empty),
+            "Explanation": "NiFi CRON batch may not have fired yet",
         }, level="warning")
 
     total = sum(counts.values())
@@ -323,7 +273,63 @@ task_verify_bronze = PythonOperator(
 )
 
 # =============================================================================
-# Task 4 — dbt run avec SLA strict
+# Task 4 — Great Expectations (qualité des données) ← NEW
+# =============================================================================
+def verify_data_quality(**context):
+    """
+    Exécute les 3 checkpoints Great Expectations.
+    - Score >= 80% → PASS, pipeline continue
+    - Score 50-80% → WARN, pipeline continue avec alerte
+    - Score <  50% → FAIL, pipeline bloqué
+    """
+    import sys
+    import importlib.util
+    import os
+
+    # Charger run_checkpoints depuis /opt/airflow/quality/
+    spec = importlib.util.spec_from_file_location(
+        "run_checkpoints",
+        "/opt/airflow/quality/run_checkpoints.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+
+    # Adapter les chemins pour Airflow (Docker)
+    module.GX_ROOT    = "/opt/airflow/quality"
+    module.TRINO_HOST = "trino"
+    module.TRINO_PORT = 8080
+
+    spec.loader.exec_module(module)
+
+    # Exécuter les checkpoints
+    exit_code = module.run_all_checkpoints()
+
+    if exit_code == 2:
+        raise Exception(
+            "Data quality CRITICAL (< 50%) — pipeline blocked. "
+            "Check Great Expectations report."
+        )
+    elif exit_code == 1:
+        send_slack_alert({
+            "Status"     : "Data quality WARNING",
+            "Score"      : "50-80%",
+            "Action"     : "Pipeline continues — investigate data issues",
+        }, level="warning")
+        logger.warning("Quality warning — pipeline continues")
+    else:
+        logger.info("Data quality OK — all checks passed")
+
+    context["ti"].xcom_push(key="quality_exit_code", value=exit_code)
+    return f"quality_exit_code_{exit_code}"
+
+task_verify_quality = PythonOperator(
+    task_id="verify_data_quality",
+    python_callable=verify_data_quality,
+    dag=dag,
+    sla=timedelta(minutes=10),
+)
+
+# =============================================================================
+# Task 5 — dbt run
 # =============================================================================
 task_dbt_run = BashOperator(
     task_id="dbt_run",
@@ -335,13 +341,12 @@ task_dbt_run = BashOperator(
         echo "dbt run completed at $(date)"
     """,
     execution_timeout=timedelta(minutes=15),
-    # SLA strict sur dbt — doit finir en 10 minutes
     sla=timedelta(minutes=10),
     dag=dag,
 )
 
 # =============================================================================
-# Task 5 — dbt test
+# Task 6 — dbt test
 # =============================================================================
 task_dbt_test = BashOperator(
     task_id="dbt_test",
@@ -358,7 +363,7 @@ task_dbt_test = BashOperator(
 )
 
 # =============================================================================
-# Task 6 — Vérifier les Gold Data Marts
+# Task 7 — Vérifier les Gold Data Marts
 # =============================================================================
 def verify_gold_marts(**context):
     import trino
@@ -368,16 +373,11 @@ def verify_gold_marts(**context):
         request_timeout=60,
     )
     cursor = conn.cursor()
-
     marts = [
-        "gold.mart_revenue",
-        "gold.mart_network_quality",
-        "gold.mart_churn",
-        "gold.mart_arpu",
-        "gold.mart_om_activity",
-        "gold.mart_usage",
+        "gold.mart_revenue",    "gold.mart_network_quality",
+        "gold.mart_churn",      "gold.mart_arpu",
+        "gold.mart_om_activity","gold.mart_usage",
     ]
-
     results = {}
     empty   = []
     for mart in marts:
@@ -386,12 +386,9 @@ def verify_gold_marts(**context):
         logger.info(f"  {mart}: {results[mart]} rows")
         if results[mart] == 0:
             empty.append(mart)
-
     if empty:
         raise Exception(f"Empty Gold marts after dbt run: {empty}")
-
-    total = sum(results.values())
-    logger.info(f"Gold OK — {len(marts)} marts, {total} total rows")
+    logger.info(f"Gold OK — {len(marts)} marts populated")
     context["ti"].xcom_push(key="gold_counts", value=results)
     return results
 
@@ -403,25 +400,28 @@ task_verify_gold = PythonOperator(
 )
 
 # =============================================================================
-# Task 7 — Pipeline summary avec alerte succès
+# Task 8 — Pipeline summary
 # =============================================================================
 def pipeline_summary(**context):
-    ti          = context["ti"]
-    bronze      = ti.xcom_pull(
-                    task_ids="verify_bronze_counts",
-                    key="bronze_counts") or {}
-    gold        = ti.xcom_pull(
-                    task_ids="verify_gold_marts",
-                    key="gold_counts") or {}
-    checkpoints = ti.xcom_pull(
-                    task_ids="verify_streaming",
-                    key="streaming_checkpoints") or 0
-    job_id      = ti.xcom_pull(
-                    task_ids="verify_streaming",
-                    key="flink_job_id") or "unknown"
+    ti           = context["ti"]
+    bronze       = ti.xcom_pull(
+                     task_ids="verify_bronze_counts",
+                     key="bronze_counts") or {}
+    gold         = ti.xcom_pull(
+                     task_ids="verify_gold_marts",
+                     key="gold_counts") or {}
+    checkpoints  = ti.xcom_pull(
+                     task_ids="verify_streaming",
+                     key="streaming_checkpoints") or 0
+    job_id       = ti.xcom_pull(
+                     task_ids="verify_streaming",
+                     key="flink_job_id") or "unknown"
+    quality_code = ti.xcom_pull(
+                     task_ids="verify_data_quality",
+                     key="quality_exit_code") or 0
 
-    bronze_total = sum(bronze.values())
-    gold_total   = sum(gold.values())
+    quality_label = {0: "PASS ✅", 1: "WARN ⚠️",
+                     2: "FAIL ❌"}.get(quality_code, "UNKNOWN")
 
     logger.info("=" * 55)
     logger.info("ILAM PIPELINE SUMMARY")
@@ -429,19 +429,20 @@ def pipeline_summary(**context):
     logger.info(f"  PyFlink Job ID    : {job_id}")
     logger.info(f"  Checkpoints       : {checkpoints}")
     logger.info(f"  Bronze tables     : {len(bronze)}/9")
-    logger.info(f"  Bronze total rows : {bronze_total}")
+    logger.info(f"  Bronze total rows : {sum(bronze.values())}")
+    logger.info(f"  Data quality      : {quality_label}")
     logger.info(f"  Gold marts        : {len(gold)}/6")
-    logger.info(f"  Gold total rows   : {gold_total}")
+    logger.info(f"  Gold total rows   : {sum(gold.values())}")
     logger.info(f"  Status            : SUCCESS")
     logger.info("=" * 55)
 
-    # Alerte succès simulée
     send_slack_alert({
-        "Date"            : context["ds"],
-        "Bronze rows"     : bronze_total,
-        "Gold marts"      : f"{len(gold)}/6",
-        "Checkpoints"     : checkpoints,
-        "Status"          : "SUCCESS",
+        "Date"        : context["ds"],
+        "Bronze rows" : sum(bronze.values()),
+        "Quality"     : quality_label,
+        "Gold marts"  : f"{len(gold)}/6",
+        "Checkpoints" : checkpoints,
+        "Status"      : "SUCCESS",
     }, level="success")
 
 task_summary = PythonOperator(
@@ -453,25 +454,12 @@ task_summary = PythonOperator(
 
 # =============================================================================
 # Dépendances
-#
-#  health_check
-#       |
-#  verify_streaming   SLA: 5min
-#       |
-#  verify_bronze      SLA: 5min
-#       |
-#  dbt_run            SLA: 10min  ← SLA strict
-#       |
-#  dbt_test           SLA: 8min
-#       |
-#  verify_gold        SLA: 5min
-#       |
-#  pipeline_summary   → alerte succès
 # =============================================================================
 (
     task_health_check
     >> task_verify_streaming
     >> task_verify_bronze
+    >> task_verify_quality    # ← Great Expectations
     >> task_dbt_run
     >> task_dbt_test
     >> task_verify_gold
