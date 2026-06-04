@@ -44,7 +44,7 @@ services:
       SINGLE_USER_CREDENTIALS_PASSWORD: ilam_password_2025
       NIFI_WEB_HTTPS_PORT: 8443
       NIFI_JVM_HEAP_INIT: 512m
-      NIFI_JVM_HEAP_MAX: 1g
+      NIFI_JVM_HEAP_MAX: 512m
     volumes:
       - nifi-data:/opt/nifi/nifi-current/data
       - nifi-logs:/opt/nifi/nifi-current/logs
@@ -473,12 +473,32 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-ilam_password_2025}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
     volumes:
       - grafana_data:/var/lib/grafana
     ports:
       - "${GRAFANA_PORT:-3000}:3000"
     networks:
       - ilam-net
+
+  ilam-api:
+    build:
+      context: ./portal/backend
+      dockerfile: Dockerfile
+    container_name: ilam-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - ilam-net
+    depends_on:
+      - trino
+      - flink-jobmanager
+      - prometheus
 
 networks:
   ilam-net:
@@ -510,4 +530,5 @@ volumes:
     name: ilam-spark-master-data
   spark_worker_data:
     name: ilam-spark-worker-data    
+ 
  

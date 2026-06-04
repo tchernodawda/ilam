@@ -434,13 +434,13 @@ metrics-check:
 	@echo "$(CYAN)Métriques ILAM disponibles :$(RESET)"
 	@curl -s "http://localhost:9090/api/v1/query?query=ilam_iceberg_table_rows" | \
 	  python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-results = data['data']['result']
-print(f'  Tables monitorées : {len(results)}')
-for r in sorted(results, key=lambda x: x['metric'].get('schema','')):
-    schema = r['metric'].get('schema','?')
-    table  = r['metric'].get('table','?')
-    value  = r['value'][1]
-    print(f'  {schema}.{table:<25} : {value} rows')
-" 2>/dev/null
+		import sys, json
+		data = json.load(sys.stdin)
+		results = data['data']['result']
+		print(f'  Tables monitorées : {len(results)}')
+		for r in sorted(results, key=lambda x: x['metric'].get('schema','')):
+			schema = r['metric'].get('schema','?')
+			table  = r['metric'].get('table','?')
+			value  = r['value'][1]
+			print(f'  {schema}.{table:<25} : {value} rows')"
+	2>/dev/null
