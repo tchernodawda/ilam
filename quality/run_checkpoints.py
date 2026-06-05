@@ -25,8 +25,8 @@ logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-GX_ROOT    = "/opt/airflow/quality"
-TRINO_HOST = "trino"
+GX_ROOT    = "/home/tcherno/ilam/quality"
+TRINO_HOST = "localhost"
 TRINO_PORT = 8080
 TRINO_USER = "ilam"
 
@@ -168,6 +168,90 @@ def run_all_checkpoints():
     logger.info(f"  Score : {result_om['score']}% "
                 f"({result_om['success']}/{result_om['total']}) "
                 f"→ {result_om['status']}")
+
+    # ── 4. bronze.cdr_sms ────────────────────────────────────────
+    logger.info("Validating bronze.cdr_sms...")
+    df_sms = get_trino_df("""
+        SELECT cdr_id, sender_msisdn, receiver_msisdn,
+               sms_type, delivery_status, charge_amount,
+               currency, origin_region
+        FROM iceberg.bronze.cdr_sms LIMIT 5000
+    """)
+    result_sms = run_validation(context, "bronze.cdr_sms", df_sms)
+    results.append(result_sms)
+    logger.info(f"  Score : {result_sms['score']}% "
+                f"({result_sms['success']}/{result_sms['total']}) "
+                f"→ {result_sms['status']}")
+
+    # ── 5. bronze.cdr_data ───────────────────────────────────────
+    logger.info("Validating bronze.cdr_data...")
+    df_data = get_trino_df("""
+        SELECT session_id, msisdn, technology,
+               bytes_uploaded, bytes_downloaded,
+               duration_seconds, charge_amount, currency
+        FROM iceberg.bronze.cdr_data LIMIT 5000
+    """)
+    result_data = run_validation(context, "bronze.cdr_data", df_data)
+    results.append(result_data)
+    logger.info(f"  Score : {result_data['score']}% "
+                f"({result_data['success']}/{result_data['total']}) "
+                f"→ {result_data['status']}")
+
+    # ── 6. bronze.network_events ─────────────────────────────────
+    logger.info("Validating bronze.network_events...")
+    df_net = get_trino_df("""
+        SELECT event_id, event_type, severity,
+               technology, region, metric_value
+        FROM iceberg.bronze.network_events LIMIT 5000
+    """)
+    result_net = run_validation(
+        context, "bronze.network_events", df_net)
+    results.append(result_net)
+    logger.info(f"  Score : {result_net['score']}% "
+                f"({result_net['success']}/{result_net['total']}) "
+                f"→ {result_net['status']}")
+
+    # ── 7. bronze.recharges ──────────────────────────────────────
+    logger.info("Validating bronze.recharges...")
+    df_rec = get_trino_df("""
+        SELECT recharge_id, msisdn, amount,
+               currency, channel, status, region
+        FROM iceberg.bronze.recharges LIMIT 5000
+    """)
+    result_rec = run_validation(context, "bronze.recharges", df_rec)
+    results.append(result_rec)
+    logger.info(f"  Score : {result_rec['score']}% "
+                f"({result_rec['success']}/{result_rec['total']}) "
+                f"→ {result_rec['status']}")
+
+    # ── 8. bronze.complaints ─────────────────────────────────────
+    logger.info("Validating bronze.complaints...")
+    df_comp = get_trino_df("""
+        SELECT complaint_id, subscriber_id, msisdn,
+               channel, category, priority, status, region
+        FROM iceberg.bronze.complaints LIMIT 5000
+    """)
+    result_comp = run_validation(
+        context, "bronze.complaints", df_comp)
+    results.append(result_comp)
+    logger.info(f"  Score : {result_comp['score']}% "
+                f"({result_comp['success']}/{result_comp['total']}) "
+                f"→ {result_comp['status']}")
+
+    # ── 9. bronze.contracts ──────────────────────────────────────
+    logger.info("Validating bronze.contracts...")
+    df_cont = get_trino_df("""
+        SELECT contract_id, subscriber_id, msisdn,
+               offer_code, product_type, plan_type,
+               monthly_fee, currency, status
+        FROM iceberg.bronze.contracts LIMIT 5000
+    """)
+    result_cont = run_validation(
+        context, "bronze.contracts", df_cont)
+    results.append(result_cont)
+    logger.info(f"  Score : {result_cont['score']}% "
+                f"({result_cont['success']}/{result_cont['total']}) "
+                f"→ {result_cont['status']}")
 
     # ── Rapport global ───────────────────────────────────────────
     total_expectations = sum(r["total"]   for r in results)

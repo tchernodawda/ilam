@@ -1,0 +1,62 @@
+{
+  "data_asset_type": null,
+  "expectation_suite_name": "bronze.complaints",
+  "expectations": [
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "complaint_id"
+      },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "msisdn"
+      },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "priority",
+        "value_set": [
+          "MEDIUM",
+          "HIGH",
+          "LOW"
+        ]
+      },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "status",
+        "value_set": [
+          "OPEN",
+          "RESOLVED",
+          "IN_PROGRESS"
+        ]
+      },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "channel",
+        "value_set": [
+          "CALL_CENTER",
+          "ONLINE",
+          "REVENDEUR",
+          "BOUTIQUE",
+          "USSD"
+        ]
+      },
+      "meta": {}
+    }
+  ],
+  "ge_cloud_id": null,
+  "meta": {
+    "great_expectations_version": "0.18.19"
+  }
+}

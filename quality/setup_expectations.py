@@ -275,6 +275,247 @@ def configure_datasource(context):
     logger.info("Pandas datasource configured")
 
 
+
+
+def setup_cdr_sms_suite(context):
+    """Suite bronze.cdr_sms — 8 expectations."""
+    logger.info("Setting up suite: bronze.cdr_sms")
+    suite = context.add_or_update_expectation_suite(
+        expectation_suite_name="bronze.cdr_sms")
+    df = get_trino_df("""
+        SELECT cdr_id, sender_msisdn, receiver_msisdn,
+               sms_type, delivery_status, charge_amount,
+               currency, origin_region
+        FROM iceberg.bronze.cdr_sms LIMIT 5000
+    """)
+    logger.info(f"  Loaded {len(df)} CDR SMS records")
+    validator = context.get_validator(
+        batch_request=RuntimeBatchRequest(
+            datasource_name="pandas_datasource",
+            data_connector_name="runtime_data_connector",
+            data_asset_name="bronze.cdr_sms",
+            runtime_parameters={"batch_data": df},
+            batch_identifiers={"run_id": "setup"},
+        ),
+        expectation_suite=suite,
+    )
+    validator.expect_column_values_to_not_be_null("cdr_id")
+    validator.expect_column_values_to_not_be_null("sender_msisdn")
+    validator.expect_column_values_to_not_be_null("receiver_msisdn")
+    validator.expect_column_values_to_be_in_set(
+        "delivery_status",
+        ["DELIVERED", "FAILED", "PENDING", "EXPIRED"])
+    validator.expect_column_values_to_be_in_set(
+        "sms_type", ["MO", "MT", "P2P", "A2P"])
+    validator.expect_column_values_to_be_between(
+        "charge_amount", min_value=0, max_value=10000)
+    validator.expect_column_values_to_be_in_set(
+        "currency", ["XOF"])
+    validator.expect_table_row_count_to_be_between(
+        min_value=100, max_value=100000000)
+    validator.save_expectation_suite(discard_failed_expectations=False)
+    logger.info("  Suite bronze.cdr_sms saved — 8 expectations")
+    return suite
+
+
+def setup_cdr_data_suite(context):
+    """Suite bronze.cdr_data — 8 expectations."""
+    logger.info("Setting up suite: bronze.cdr_data")
+    suite = context.add_or_update_expectation_suite(
+        expectation_suite_name="bronze.cdr_data")
+    df = get_trino_df("""
+        SELECT session_id, msisdn, technology,
+               bytes_uploaded, bytes_downloaded,
+               duration_seconds, charge_amount, currency
+        FROM iceberg.bronze.cdr_data LIMIT 5000
+    """)
+    logger.info(f"  Loaded {len(df)} CDR Data records")
+    validator = context.get_validator(
+        batch_request=RuntimeBatchRequest(
+            datasource_name="pandas_datasource",
+            data_connector_name="runtime_data_connector",
+            data_asset_name="bronze.cdr_data",
+            runtime_parameters={"batch_data": df},
+            batch_identifiers={"run_id": "setup"},
+        ),
+        expectation_suite=suite,
+    )
+    validator.expect_column_values_to_not_be_null("session_id")
+    validator.expect_column_values_to_not_be_null("msisdn")
+    validator.expect_column_values_to_be_in_set(
+        "technology", ["2G", "3G", "4G", "5G", "WIFI"])
+    validator.expect_column_values_to_be_between(
+        "bytes_uploaded", min_value=0, max_value=10000000000)
+    validator.expect_column_values_to_be_between(
+        "bytes_downloaded", min_value=0, max_value=10000000000)
+    validator.expect_column_values_to_be_between(
+        "duration_seconds", min_value=0, max_value=86400)
+    validator.expect_column_values_to_be_in_set(
+        "currency", ["XOF"])
+    validator.expect_table_row_count_to_be_between(
+        min_value=100, max_value=100000000)
+    validator.save_expectation_suite(discard_failed_expectations=False)
+    logger.info("  Suite bronze.cdr_data saved — 8 expectations")
+    return suite
+
+
+def setup_network_events_suite(context):
+    """Suite bronze.network_events — 6 expectations."""
+    logger.info("Setting up suite: bronze.network_events")
+    suite = context.add_or_update_expectation_suite(
+        expectation_suite_name="bronze.network_events")
+    df = get_trino_df("""
+        SELECT event_id, event_type, severity,
+               technology, region, metric_value
+        FROM iceberg.bronze.network_events LIMIT 5000
+    """)
+    logger.info(f"  Loaded {len(df)} network event records")
+    validator = context.get_validator(
+        batch_request=RuntimeBatchRequest(
+            datasource_name="pandas_datasource",
+            data_connector_name="runtime_data_connector",
+            data_asset_name="bronze.network_events",
+            runtime_parameters={"batch_data": df},
+            batch_identifiers={"run_id": "setup"},
+        ),
+        expectation_suite=suite,
+    )
+    validator.expect_column_values_to_not_be_null("event_id")
+    validator.expect_column_values_to_not_be_null("event_type")
+    validator.expect_column_values_to_be_in_set(
+        "severity", ["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+    validator.expect_column_values_to_be_in_set(
+        "technology", ["2G", "3G", "4G", "5G"])
+    validator.expect_column_values_to_be_between(
+        "metric_value", min_value=0, max_value=1000000)
+    validator.expect_table_row_count_to_be_between(
+        min_value=100, max_value=100000000)
+    validator.save_expectation_suite(discard_failed_expectations=False)
+    logger.info("  Suite bronze.network_events saved — 6 expectations")
+    return suite
+
+
+def setup_recharges_suite(context):
+    """Suite bronze.recharges — 7 expectations."""
+    logger.info("Setting up suite: bronze.recharges")
+    suite = context.add_or_update_expectation_suite(
+        expectation_suite_name="bronze.recharges")
+    df = get_trino_df("""
+        SELECT recharge_id, msisdn, amount,
+               currency, channel, status, region
+        FROM iceberg.bronze.recharges LIMIT 5000
+    """)
+    logger.info(f"  Loaded {len(df)} recharge records")
+    # Détecter les valeurs réelles
+    channels = df["channel"].dropna().unique().tolist()
+    statuses = df["status"].dropna().unique().tolist()
+    logger.info(f"  channels: {channels}")
+    logger.info(f"  statuses: {statuses}")
+    validator = context.get_validator(
+        batch_request=RuntimeBatchRequest(
+            datasource_name="pandas_datasource",
+            data_connector_name="runtime_data_connector",
+            data_asset_name="bronze.recharges",
+            runtime_parameters={"batch_data": df},
+            batch_identifiers={"run_id": "setup"},
+        ),
+        expectation_suite=suite,
+    )
+    validator.expect_column_values_to_not_be_null("recharge_id")
+    validator.expect_column_values_to_not_be_null("msisdn")
+    validator.expect_column_values_to_be_between(
+        "amount", min_value=1, max_value=1000000)
+    validator.expect_column_values_to_be_in_set(
+        "currency", ["XOF"])
+    validator.expect_column_values_to_be_in_set(
+        "channel", value_set=channels)
+    validator.expect_column_values_to_be_in_set(
+        "status", value_set=statuses)
+    validator.expect_table_row_count_to_be_between(
+        min_value=10, max_value=100000000)
+    validator.save_expectation_suite(discard_failed_expectations=False)
+    logger.info("  Suite bronze.recharges saved — 7 expectations")
+    return suite
+
+
+def setup_complaints_suite(context):
+    """Suite bronze.complaints — 5 expectations."""
+    logger.info("Setting up suite: bronze.complaints")
+    suite = context.add_or_update_expectation_suite(
+        expectation_suite_name="bronze.complaints")
+    df = get_trino_df("""
+        SELECT complaint_id, subscriber_id, msisdn,
+               channel, category, priority, status, region
+        FROM iceberg.bronze.complaints LIMIT 5000
+    """)
+    logger.info(f"  Loaded {len(df)} complaint records")
+    priorities = df["priority"].dropna().unique().tolist()
+    statuses   = df["status"].dropna().unique().tolist()
+    channels   = df["channel"].dropna().unique().tolist()
+    validator = context.get_validator(
+        batch_request=RuntimeBatchRequest(
+            datasource_name="pandas_datasource",
+            data_connector_name="runtime_data_connector",
+            data_asset_name="bronze.complaints",
+            runtime_parameters={"batch_data": df},
+            batch_identifiers={"run_id": "setup"},
+        ),
+        expectation_suite=suite,
+    )
+    validator.expect_column_values_to_not_be_null("complaint_id")
+    validator.expect_column_values_to_not_be_null("msisdn")
+    validator.expect_column_values_to_be_in_set(
+        "priority", value_set=priorities)
+    validator.expect_column_values_to_be_in_set(
+        "status",   value_set=statuses)
+    validator.expect_column_values_to_be_in_set(
+        "channel",  value_set=channels)
+    validator.save_expectation_suite(discard_failed_expectations=False)
+    logger.info("  Suite bronze.complaints saved — 5 expectations")
+    return suite
+
+
+def setup_contracts_suite(context):
+    """Suite bronze.contracts — 7 expectations."""
+    logger.info("Setting up suite: bronze.contracts")
+    suite = context.add_or_update_expectation_suite(
+        expectation_suite_name="bronze.contracts")
+    df = get_trino_df("""
+        SELECT contract_id, subscriber_id, msisdn,
+               offer_code, product_type, plan_type,
+               monthly_fee, currency, status
+        FROM iceberg.bronze.contracts LIMIT 5000
+    """)
+    logger.info(f"  Loaded {len(df)} contract records")
+    product_types = df["product_type"].dropna().unique().tolist()
+    plan_types    = df["plan_type"].dropna().unique().tolist()
+    statuses      = df["status"].dropna().unique().tolist()
+    validator = context.get_validator(
+        batch_request=RuntimeBatchRequest(
+            datasource_name="pandas_datasource",
+            data_connector_name="runtime_data_connector",
+            data_asset_name="bronze.contracts",
+            runtime_parameters={"batch_data": df},
+            batch_identifiers={"run_id": "setup"},
+        ),
+        expectation_suite=suite,
+    )
+    validator.expect_column_values_to_not_be_null("contract_id")
+    validator.expect_column_values_to_not_be_null("msisdn")
+    validator.expect_column_values_to_be_in_set(
+        "product_type", value_set=product_types)
+    validator.expect_column_values_to_be_in_set(
+        "plan_type",    value_set=plan_types)
+    validator.expect_column_values_to_be_in_set(
+        "status",       value_set=statuses)
+    validator.expect_column_values_to_be_between(
+        "monthly_fee", min_value=0, max_value=1000000)
+    validator.expect_column_values_to_be_in_set(
+        "currency", ["XOF"])
+    validator.save_expectation_suite(discard_failed_expectations=False)
+    logger.info("  Suite bronze.contracts saved — 7 expectations")
+    return suite
+
 def main():
     logger.info("=" * 55)
     logger.info("ILAM — Great Expectations Setup")
@@ -294,11 +535,24 @@ def main():
     setup_subscribers_suite(context)
     setup_om_transactions_suite(context)
 
+    setup_cdr_sms_suite(context)
+    setup_cdr_data_suite(context)
+    setup_network_events_suite(context)
+    setup_recharges_suite(context)
+    setup_complaints_suite(context)
+    setup_contracts_suite(context)
+
     logger.info("=" * 55)
     logger.info("All expectation suites created successfully.")
     logger.info(f"  bronze.cdr_voice       : 8 expectations")
     logger.info(f"  bronze.subscribers     : 6 expectations")
     logger.info(f"  bronze.om_transactions : 7 expectations")
+    logger.info(f"  bronze.cdr_sms         : 8 expectations")
+    logger.info(f"  bronze.cdr_data        : 8 expectations")
+    logger.info(f"  bronze.network_events  : 6 expectations")
+    logger.info(f"  bronze.recharges       : 7 expectations")
+    logger.info(f"  bronze.complaints      : 5 expectations")
+    logger.info(f"  bronze.contracts       : 7 expectations")
     logger.info("=" * 55)
 
 

@@ -493,6 +493,7 @@ services:
       - "8000:8000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./quality:/opt/airflow/quality
     networks:
       - ilam-net
     depends_on:

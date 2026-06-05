@@ -1,0 +1,116 @@
+{
+  "run_date": "2026-06-05T18:28:00.586208",
+  "global_score": 93.5,
+  "global_status": "PASS",
+  "tables": [
+    {
+      "suite": "bronze.cdr_voice",
+      "total": 8,
+      "success": 8,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    },
+    {
+      "suite": "bronze.subscribers",
+      "total": 6,
+      "success": 6,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    },
+    {
+      "suite": "bronze.om_transactions",
+      "total": 7,
+      "success": 6,
+      "failed": 1,
+      "score": 85.7,
+      "status": "PASS",
+      "failed_expectations": [
+        {
+          "expectation": "expect_column_values_to_be_in_set",
+          "column": "transaction_type",
+          "details": "{'element_count': 5000, 'unexpected_count': 1045, 'unexpected_percent': 20.9, 'partial_unexpected_list': ['TRANSFERT', 'TRANSFERT', 'TRANSFERT', 'TRANSFERT', 'TRANSFERT', 'TRANSFERT', 'TRANSFERT', 'TR"
+        }
+      ]
+    },
+    {
+      "suite": "bronze.cdr_sms",
+      "total": 8,
+      "success": 7,
+      "failed": 1,
+      "score": 87.5,
+      "status": "PASS",
+      "failed_expectations": [
+        {
+          "expectation": "expect_column_values_to_be_in_set",
+          "column": "sms_type",
+          "details": "{'element_count': 5000, 'unexpected_count': 5000, 'unexpected_percent': 100.0, 'partial_unexpected_list': ['ON_NET', 'ON_NET', 'ON_NET', 'ON_NET', 'ON_NET', 'ON_NET', 'ON_NET', 'ON_NET', 'ON_NET', 'ON"
+        }
+      ]
+    },
+    {
+      "suite": "bronze.cdr_data",
+      "total": 8,
+      "success": 8,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    },
+    {
+      "suite": "bronze.network_events",
+      "total": 6,
+      "success": 4,
+      "failed": 2,
+      "score": 66.7,
+      "status": "WARN",
+      "failed_expectations": [
+        {
+          "expectation": "expect_column_values_to_be_in_set",
+          "column": "severity",
+          "details": "{'element_count': 5000, 'unexpected_count': 4825, 'unexpected_percent': 96.5, 'partial_unexpected_list': ['MINOR', 'INFO', 'WARNING', 'WARNING', 'WARNING', 'WARNING', 'WARNING', 'WARNING', 'WARNING', "
+        },
+        {
+          "expectation": "expect_column_values_to_be_in_set",
+          "column": "technology",
+          "details": "{'element_count': 5000, 'unexpected_count': 357, 'unexpected_percent': 7.140000000000001, 'partial_unexpected_list': ['4G+', '4G+', '4G+', '4G+', '4G+', '4G+', '4G+', '4G+', '4G+', '4G+', '4G+', '4G+'"
+        }
+      ]
+    },
+    {
+      "suite": "bronze.recharges",
+      "total": 7,
+      "success": 7,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    },
+    {
+      "suite": "bronze.complaints",
+      "total": 5,
+      "success": 5,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    },
+    {
+      "suite": "bronze.contracts",
+      "total": 7,
+      "success": 7,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    }
+  ],
+  "summary": {
+    "total_expectations": 62,
+    "total_success": 58,
+    "total_failed": 4
+  }
+}

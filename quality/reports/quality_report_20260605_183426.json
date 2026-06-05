@@ -1,0 +1,93 @@
+{
+  "run_date": "2026-06-05T18:34:26.713072",
+  "global_score": 100.0,
+  "global_status": "PASS",
+  "tables": [
+    {
+      "suite": "bronze.cdr_voice",
+      "total": 8,
+      "success": 8,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    },
+    {
+      "suite": "bronze.subscribers",
+      "total": 6,
+      "success": 6,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    },
+    {
+      "suite": "bronze.om_transactions",
+      "total": 7,
+      "success": 7,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    },
+    {
+      "suite": "bronze.cdr_sms",
+      "total": 8,
+      "success": 8,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    },
+    {
+      "suite": "bronze.cdr_data",
+      "total": 8,
+      "success": 8,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    },
+    {
+      "suite": "bronze.network_events",
+      "total": 6,
+      "success": 6,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    },
+    {
+      "suite": "bronze.recharges",
+      "total": 7,
+      "success": 7,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    },
+    {
+      "suite": "bronze.complaints",
+      "total": 5,
+      "success": 5,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    },
+    {
+      "suite": "bronze.contracts",
+      "total": 7,
+      "success": 7,
+      "failed": 0,
+      "score": 100.0,
+      "status": "PASS",
+      "failed_expectations": []
+    }
+  ],
+  "summary": {
+    "total_expectations": 62,
+    "total_success": 62,
+    "total_failed": 0
+  }
+}
