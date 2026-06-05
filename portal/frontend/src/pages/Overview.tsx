@@ -283,7 +283,6 @@ function KpiCard({ icon, label, value, color, status, suffix }: any) {
 
   return (
     <div style={{
-      background   : 'white',
       borderRadius : 8,
       padding      : '16px 20px',
       border       : `1px solid ${sc.border}`,

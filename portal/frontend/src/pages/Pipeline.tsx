@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
 import {
   getFlinkJobs, getFlinkOverview,
-  getAirflowDags, getDagRuns, triggerDag,
-  startPyFlinkJob, getTaskStates, getKafkaTopics
+  startPyFlinkJob, getTaskStates, getKafkaTopics ,getDagRuns, triggerDag
 } from '../api/services'
 import {
   Play, RefreshCw, CheckCircle, XCircle,
   AlertTriangle, Zap, ChevronDown, ChevronUp,
-  Radio, Database
+  Radio
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 

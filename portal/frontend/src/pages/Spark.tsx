@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getSparkCluster, getSparkApps, submitSparkJob } from '../api/services'
-import { Zap, Play, CheckCircle, Clock } from 'lucide-react'
+import { Zap, Play } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function Spark() {

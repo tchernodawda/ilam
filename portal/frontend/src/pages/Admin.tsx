@@ -1,4 +1,4 @@
-import { Settings, Users, Database, Server } from 'lucide-react'
+import { Users, Database, Server } from 'lucide-react'
 
 const users = [
   { username: 'ilam_admin', role: 'Admin',    email: 'admin@ilam.io' },

@@ -125,7 +125,7 @@ export default function Sidebar() {
               <div style={{
                 width          : 30,
                 height         : 30,
-                background     : 'var(--orange)',
+                background     : 'var(--teal-light)',
                 borderRadius   : '50%',
                 display        : 'flex',
                 alignItems     : 'center',

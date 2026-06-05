@@ -500,6 +500,19 @@ services:
       - flink-jobmanager
       - prometheus
 
+  ilam-portal:
+    build:
+      context: ./portal/frontend
+      dockerfile: Dockerfile
+    container_name: ilam-portal
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    networks:
+      - ilam-net
+    depends_on:
+      - ilam-api
+
 networks:
   ilam-net:
     name: ilam-network
@@ -532,3 +545,5 @@ volumes:
     name: ilam-spark-worker-data    
  
  
+
+  

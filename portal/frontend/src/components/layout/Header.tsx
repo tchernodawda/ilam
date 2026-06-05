@@ -1,5 +1,5 @@
 import { useLocation } from 'react-router-dom'
-import { Bell, RefreshCw } from 'lucide-react'
+import { Bell } from 'lucide-react'
 
 const titles: Record<string, string> = {
   '/'            : 'Vue d\'ensemble',
