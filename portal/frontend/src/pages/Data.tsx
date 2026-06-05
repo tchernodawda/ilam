@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getAllTables, previewTable, runQuery } from '../api/services'
-import { Database, Search, Play, Table, ChevronRight } from 'lucide-react'
+import { Database, Search, Play, Table, ChevronRight, GitBranch } from 'lucide-react'
 import Editor from '@monaco-editor/react'
 
 export default function Data() {
@@ -10,7 +10,7 @@ export default function Data() {
   const [sql,         setSql]         = useState('SELECT *\nFROM iceberg.bronze.cdr_voice\nLIMIT 20')
   const [queryResult, setQueryResult] = useState<any>(null)
   const [loading,     setLoading]     = useState(false)
-  const [activeTab,   setActiveTab]   = useState<'browse'|'query'>('browse')
+  const [activeTab,   setActiveTab]   = useState<'browse'|'query'|'lineage'>('browse')
   const [search,      setSearch]      = useState('')
   const [schema,      setSchema]      = useState('all')
 
@@ -128,8 +128,9 @@ export default function Data() {
           border: '1px solid var(--gray-200)', borderBottom: 'none',
         }}>
           {[
-            { id: 'browse', label: 'Explorateur', icon: Table },
-            { id: 'query',  label: 'Éditeur SQL', icon: Play },
+            { id: 'browse',  label: 'Explorateur',  icon: Table },
+            { id: 'query',   label: 'Éditeur SQL',  icon: Play },
+            { id: 'lineage', label: 'Lignée dbt',   icon: GitBranch },
           ].map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} style={{
               display: 'flex', alignItems: 'center', gap: 6,

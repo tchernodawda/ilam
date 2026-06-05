@@ -444,3 +444,20 @@ metrics-check:
 			value  = r['value'][1]
 			print(f'  {schema}.{table:<25} : {value} rows')"
 	2>/dev/null
+
+# Démarrer dbt docs (lignée des données)
+dbt-docs:
+	@echo "$(CYAN)Starting dbt docs server on :8086...$(RESET)"
+	@cd transform/ilam_transform && \
+	  nohup dbt docs serve --profiles-dir . \
+	  --port 8086 --no-browser > /tmp/dbt_docs.log 2>&1 & \
+	  echo "dbt docs running at http://localhost:8086"
+
+# Générer + démarrer dbt docs
+dbt-docs-generate:
+	@echo "$(CYAN)Generating dbt docs...$(RESET)"
+	@cd transform/ilam_transform && \
+	  dbt docs generate --profiles-dir . --target local 2>/dev/null && \
+	  nohup dbt docs serve --profiles-dir . \
+	  --port 8086 --no-browser > /tmp/dbt_docs.log 2>&1 & \
+	  echo "dbt docs running at http://localhost:8086"
