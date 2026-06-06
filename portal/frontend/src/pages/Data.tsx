@@ -47,11 +47,16 @@ export default function Data() {
 
   return (
     <div style={{ display: 'flex', gap: 20, height: 'calc(100vh - 130px)' }}>
-      {/* Sidebar tables */}
+      {/* Sidebar tables — masquée en mode lineage */}
       <div style={{
-        width: 260, background: 'white', borderRadius: 8,
-        border: '1px solid var(--gray-200)', display: 'flex',
+        width: activeTab === 'lineage' ? 0 : 260,
+        minWidth: activeTab === 'lineage' ? 0 : 260,
+        background: 'white', borderRadius: 8,
+        border: activeTab === 'lineage'
+          ? 'none' : '1px solid var(--gray-200)',
+        display: activeTab === 'lineage' ? 'none' : 'flex',
         flexDirection: 'column', overflow: 'hidden',
+        transition: 'all 0.25s ease',
       }}>
         <div style={{ padding: '12px', borderBottom: '1px solid var(--gray-200)' }}>
           <div style={{ position: 'relative', marginBottom: 8 }}>
@@ -202,6 +207,19 @@ export default function Data() {
                 </div>
               ) : null}
             </div>
+          )}
+
+          {activeTab === 'lineage' && (
+            <iframe
+              src="http://localhost:8086"
+              style={{
+                width   : '100%',
+                height  : 'calc(100vh - 170px)',
+                border  : 'none',
+                display : 'block',
+              }}
+              title="dbt Lineage"
+            />
           )}
 
           {activeTab === 'query' && (
