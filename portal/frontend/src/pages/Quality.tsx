@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import ServiceLinks from '../components/shared/ServiceLinks'
 import { Shield, CheckCircle, XCircle, AlertTriangle, RefreshCw } from 'lucide-react'
 import api from '../api/client'
 
@@ -58,6 +59,11 @@ export default function Quality() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <ServiceLinks title="Services" services={[
+        { name: 'Airflow',   url: 'http://localhost:8082', port: '8082' },
+        { name: 'Trino',     url: 'http://localhost:8080', port: '8080' },
+        { name: 'Grafana',   url: 'http://localhost:3000', port: '3000' },
+      ]} />
 
       {/* Score global */}
       <div className="card" style={{

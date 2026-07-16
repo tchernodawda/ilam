@@ -1,3 +1,5 @@
+import ServiceLinks from '../components/shared/ServiceLinks'
+import DocButton from '../components/shared/DocButton'
 import { useEffect, useState } from 'react'
 import { getSparkCluster, getSparkApps, submitSparkJob } from '../api/services'
 import { Zap, Play } from 'lucide-react'
@@ -77,6 +79,11 @@ export default function Spark() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <ServiceLinks title="Services" services={[
+        { name: 'Spark UI',  url: 'http://localhost:8090', port: '8090' },
+        { name: 'Trino',     url: 'http://localhost:8080', port: '8080' },
+        { name: 'MinIO',     url: 'http://localhost:9001', port: '9001' },
+      ]} />
 
       {/* Cluster Status */}
       <div className="card">
@@ -175,36 +182,52 @@ export default function Spark() {
                   }}>{job.output}</span>
                 </div>
               </div>
-              <button
+              <DocButton
+                label={submitting === job.id ? 'Soumission...' : 'Lancer'}
+                icon={<Play size={12} />}
                 onClick={() => handleSubmit(job.id)}
                 disabled={submitting !== null}
-                className="btn btn-primary"
-                style={{
-                  width      : '100%',
-                  justifyContent: 'center',
-                  fontSize   : 13,
-                  background : job.color,
-                }}
-              >
-                <Play size={12} />
-                {submitting === job.id
-                  ? 'Soumission...' : 'Lancer'}
-              </button>
+                implemented={true}
+                color={job.color}
+                steps={[
+                  { label: 'Copie du script',
+                    desc: 'Le script Python est copié dans le conteneur spark-master' },
+                  { label: 'spark-submit',
+                    desc: 'spark-submit --master spark://spark-master:7077 --py-files ...' },
+                  { label: 'Lecture Bronze',
+                    desc: 'Spark lit les tables Iceberg depuis MinIO via s3a://' },
+                  { label: 'Transformation',
+                    desc: 'Déduplication, enrichissement ou agrégation selon le job' },
+                  { label: 'Écriture Iceberg',
+                    desc: 'Résultats écrits en Silver ou Gold via Iceberg Java SDK' },
+                ]}
+              />
             </div>
           ))}
         </div>
 
-        <button
-          onClick={() => handleSubmit('all')}
-          disabled={submitting !== null}
-          className="btn btn-secondary"
-          style={{ width: '100%', justifyContent: 'center' }}
-        >
-          <Play size={14} />
-          {submitting === 'all'
+        <DocButton
+          label={submitting === 'all'
             ? 'Soumission en cours...'
             : 'Lancer tous les jobs (Bronze → Silver → Gold)'}
-        </button>
+          icon={<Play size={14} />}
+          onClick={() => handleSubmit('all')}
+          disabled={submitting !== null}
+          implemented={true}
+          color="#FF6600"
+          steps={[
+            { label: 'Job 1 — bronze_preprocessing',
+              desc: 'Déduplication + normalisation MSISDN → bronze.cdr_voice_clean' },
+            { label: 'Job 2 — silver_enrichment',
+              desc: 'Jointure CDR × Abonnés → silver.cdr_voice_enriched' },
+            { label: 'Job 3 — gold_aggregation',
+              desc: 'Calcul revenus, ARPU, fraude OM → gold.spark_mart_*' },
+            { label: 'Validation',
+              desc: 'Vérification du nombre de lignes écrites par job' },
+            { label: 'Rapport',
+              desc: 'Statut final affiché dans le Portal' },
+          ]}
+        />
       </div>
 
       {/* Apps history */}

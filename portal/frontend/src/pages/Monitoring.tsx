@@ -1,3 +1,4 @@
+import ServiceLinks from '../components/shared/ServiceLinks'
 import { useEffect, useState } from 'react'
 import { getMetrics, getGrafanaDashboards } from '../api/services'
 import { ExternalLink, Activity } from 'lucide-react'
@@ -21,6 +22,11 @@ export default function Monitoring() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <ServiceLinks title="Services" services={[
+        { name: 'Grafana',    url: 'http://localhost:3000', port: '3000' },
+        { name: 'Prometheus', url: 'http://localhost:9090', port: '9090' },
+        { name: 'ILAM Exporter', url: 'http://localhost:8089', port: '8089' },
+      ]} />
 
       {/* Métriques temps réel */}
       <div className="card">

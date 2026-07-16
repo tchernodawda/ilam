@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getPlatformOverview, getTableCounts } from '../api/services'
+import api from '../api/client'
 import {
   Activity, Database, Zap, Shield,
   TrendingUp, Server, CheckCircle, XCircle
@@ -10,19 +11,22 @@ import {
 } from 'recharts'
 
 export default function Overview() {
-  const [overview, setOverview] = useState<any>(null)
-  const [counts,   setCounts]   = useState<any>({})
-  const [loading,  setLoading]  = useState(true)
+  const [overview,   setOverview]   = useState<any>(null)
+  const [counts,     setCounts]     = useState<any>({})
+  const [sysMetrics, setSysMetrics] = useState<any>(null)
+  const [loading,    setLoading]    = useState(true)
 
   useEffect(() => {
     const fetch = async () => {
       try {
-        const [ov, ct] = await Promise.all([
+        const [ov, ct, sys] = await Promise.all([
           getPlatformOverview(),
           getTableCounts(),
+          api.get('/monitoring/system'),
         ])
         setOverview(ov.data)
         setCounts(ct.data)
+        setSysMetrics(sys.data)
       } catch (e) {
         console.error(e)
       } finally {
@@ -58,6 +62,82 @@ export default function Overview() {
 
   return (
     <div>
+      {/* System Metrics */}
+      <div style={{
+        display             : 'grid',
+        gridTemplateColumns : 'repeat(4, 1fr)',
+        gap                 : 12,
+        marginBottom        : 4,
+      }}>
+        {[
+          {
+            label : 'CPU',
+            value : sysMetrics?.cpu_usage_pct ?? '—',
+            unit  : '%',
+            color : (sysMetrics?.cpu_usage_pct ?? 0) > 80 ? '#E24B4A'
+                  : (sysMetrics?.cpu_usage_pct ?? 0) > 60 ? '#F59E0B'
+                  : '#10B981',
+          },
+          {
+            label : 'RAM utilisée',
+            value : sysMetrics?.ram_used_gb ?? '—',
+            unit  : 'GB',
+            color : (sysMetrics?.ram_usage_pct ?? 0) > 85 ? '#E24B4A'
+                  : (sysMetrics?.ram_usage_pct ?? 0) > 70 ? '#F59E0B'
+                  : '#10B981',
+          },
+          {
+            label : 'RAM totale',
+            value : sysMetrics?.ram_total_gb ?? '—',
+            unit  : 'GB',
+            color : '#008080',
+          },
+          {
+            label : 'Disque utilisé',
+            value : sysMetrics?.disk_usage_pct ?? '—',
+            unit  : '%',
+            color : (sysMetrics?.disk_usage_pct ?? 0) > 80 ? '#E24B4A'
+                  : '#10B981',
+          },
+        ].map(m => (
+          <div key={m.label} style={{
+            background   : 'var(--color-background-secondary)',
+            border       : '1px solid var(--color-border-tertiary)',
+            borderRadius : 10, padding: '12px 16px',
+          }}>
+            <div style={{
+              fontSize: 11, color: 'var(--color-text-secondary)',
+              marginBottom: 6,
+            }}>{m.label}</div>
+            <div style={{
+              fontSize: 22, fontWeight: 700, color: m.color,
+            }}>
+              {m.value}
+              <span style={{ fontSize: 12, fontWeight: 400,
+                             marginLeft: 2 }}>{m.unit}</span>
+            </div>
+            {/* Barre de progression */}
+            {(m.unit === '%' || m.label === 'RAM utilisée') && (
+              <div style={{
+                marginTop: 8, height: 4,
+                background: 'var(--color-border-tertiary)',
+                borderRadius: 2, overflow: 'hidden',
+              }}>
+                <div style={{
+                  width      : `${m.unit === '%'
+                    ? m.value
+                    : ((sysMetrics?.ram_usage_pct ?? 0))}%`,
+                  height     : '100%',
+                  background : m.color,
+                  borderRadius: 2,
+                  transition : 'width 0.5s',
+                }}/>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
       {/* KPI Cards */}
       <div style={{
         display             : 'grid',

@@ -1,3 +1,5 @@
+import DocButton from '../components/shared/DocButton'
+import ServiceLinks from '../components/shared/ServiceLinks'
 import { useEffect, useState } from 'react'
 import {
   getFlinkJobs, getFlinkOverview,
@@ -133,6 +135,12 @@ export default function Pipeline() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <ServiceLinks title="Services" services={[
+        { name: 'Flink UI',   url: 'http://localhost:8081', port: '8081' },
+        { name: 'Airflow',    url: 'http://localhost:8082', port: '8082' },
+        { name: 'Kafka',      url: 'http://localhost:9092', port: '9092' },
+        { name: 'NiFi',       url: 'https://localhost:8443', port: '8443' },
+      ]} />
 
       {/* ── Flink ───────────────────────────────────────────── */}
       <div className="card">
@@ -155,14 +163,26 @@ export default function Pipeline() {
               <RefreshCw size={13} /> Actualiser
             </button>
             {!isStreaming && (
-              <button
+              <DocButton
+                label={startingFlink ? 'Démarrage...' : 'Démarrer le streaming'}
+                icon={<Play size={12} />}
                 onClick={handleStartFlink}
                 disabled={startingFlink}
-                className="btn btn-secondary"
-                style={{ fontSize: 12 }}>
-                <Play size={12} />
-                {startingFlink ? 'Démarrage...' : 'Démarrer le streaming'}
-              </button>
+                implemented={false}
+                color="#008080"
+                steps={[
+                  { label: 'Copie du script',
+                    desc: 'flink_cdr_job.py copié dans le JobManager via docker cp' },
+                  { label: 'Soumission flink run',
+                    desc: '/opt/flink/bin/flink run --python ... --detached' },
+                  { label: 'Connexion Iceberg',
+                    desc: 'PyFlink initialise le catalogue REST Iceberg (:8181)' },
+                  { label: 'Consommation Kafka',
+                    desc: 'Le job consomme les 9 topics Kafka en exactly-once' },
+                  { label: 'Écriture Bronze',
+                    desc: 'Les événements sont écrits en Parquet dans MinIO toutes les 30s' },
+                ]}
+              />
             )}
           </div>
         </div>
@@ -330,14 +350,26 @@ export default function Pipeline() {
           }}>
             DAG Airflow : {DAG_ID}
           </h3>
-          <button
+          <DocButton
+            label={triggering ? 'Déclenchement...' : 'Déclencher DAG'}
+            icon={<Play size={12} />}
             onClick={handleTrigger}
             disabled={triggering}
-            className="btn btn-primary"
-            style={{ fontSize: 12 }}>
-            <Play size={12} />
-            {triggering ? 'Déclenchement...' : 'Déclencher'}
-          </button>
+            implemented={true}
+            color="#FF6600"
+            steps={[
+              { label: 'Appel Airflow REST API',
+                desc: 'POST /api/v1/dags/ilam_sonatel_pipeline/dagRuns' },
+              { label: 'health_check',
+                desc: 'Vérifie que Trino, MinIO et Iceberg sont accessibles' },
+              { label: 'bronze_quality',
+                desc: 'Great Expectations valide les 9 tables Bronze (62 règles)' },
+              { label: 'dbt_run',
+                desc: 'dbt transforme Bronze → Silver → Gold (18 modèles)' },
+              { label: 'summary_report',
+                desc: 'Rapport de qualité JSON sauvegardé dans /quality/reports/' },
+            ]}
+          />
         </div>
 
         {dagRuns.length === 0 ? (

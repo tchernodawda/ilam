@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import ServiceLinks from '../components/shared/ServiceLinks'
 import { getAllTables, previewTable, runQuery } from '../api/services'
 import { Database, Search, Play, Table, ChevronRight, GitBranch } from 'lucide-react'
 import Editor from '@monaco-editor/react'
@@ -46,7 +47,14 @@ export default function Data() {
   }
 
   return (
-    <div style={{ display: 'flex', gap: 20, height: 'calc(100vh - 130px)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+      <ServiceLinks title="Services" services={[
+        { name: 'Trino UI',  url: 'http://localhost:8080',  port: '8080' },
+        { name: 'MinIO',     url: 'http://localhost:9001',  port: '9001' },
+        { name: 'dbt docs',  url: 'http://localhost:8086',  port: '8086' },
+        { name: 'Iceberg',   url: 'http://localhost:8181',  port: '8181' },
+      ]} />
+      <div style={{ display: 'flex', gap: 20, height: 'calc(100vh - 160px)' }}>
       {/* Sidebar tables — masquée en mode lineage */}
       <div style={{
         width: activeTab === 'lineage' ? 0 : 260,
@@ -276,6 +284,7 @@ export default function Data() {
           )}
         </div>
       </div>
+    </div>
     </div>
   )
 }
