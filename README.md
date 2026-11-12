@@ -1,4 +1,10 @@
-# Ilam — Open-Source Data Lakehouse Platform
+# Ilam: Open-Source Data Lakehouse Platform
+
+<p align="center">
+  <img src="assets/ilam.png" 
+       alt="Ilam Logo" 
+       width="800">
+</p>
 
 > *Ilam* means **"the lake"**, **"the flow"**, **"the water current"** in Pulaar: data flowing from raw sources to insight, continuously and autonomously.
 
@@ -6,12 +12,10 @@
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" />
   </a>
-  <img src="https://img.shields.io/badge/stack-Iceberg%20%7C%20Trino%20%7C%20Flink%20%7C%20NiFi%20%7C%20dbt%20%7C%20Airflow-orange" />
+  <img src="https://img.shields.io/badge/azstack-Iceberg%20%7C%20Trino%20%7C%20Flink%20%7C%20NiFi%20%7C%20dbt%20%7C%20Airflow-orange" />
   <img src="https://img.shields.io/badge/status-WIP-yellow" />
   <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" />
 </p>
-
-Ilam is a fully open-source, end-to-end Data Lakehouse platform built on real-world telecom data from **Sonatel / Orange Sénégal**, covering CDR (voice, SMS, data), network events, CRM, and Orange Money transactions.
 
 ## Architecture
 
@@ -54,7 +58,7 @@ Ilam is a fully open-source, end-to-end Data Lakehouse platform built on real-wo
 | Security | Keycloak + Ranger | coming |
 | Agents | LangGraph | coming |
 
-## Data Model — Sonatel Telecom
+## Data Model
 
 | Layer | Tables |
 |-------|--------|
@@ -90,14 +94,14 @@ NiFi (9 Process Groups)
 
 - Docker >= 24.0 and Docker Compose >= 2.20
 - Python 3.10+ with venv
-- 8 GB RAM minimum (16 GB recommended)
+- 16 GB RAM minimum (32 GB recommended)
 - WSL2 + Ubuntu (on Windows)
 
 ## Quick Start
 
 ```bash
 # 1. Clone
-git clone https://github.com/thiernodaoudaly/ilam.git
+git clone https://github.com/tchernodawda/ilam.git
 cd ilam
 
 # 2. Python environment
@@ -147,19 +151,6 @@ make deploy-dags        # Deploy DAGs to Airflow
 make airflow-trigger    # Trigger pipeline manually
 ```
 
-## Roadmap
-
-- [x] Step 1 — Infrastructure (Docker, MinIO, Iceberg, Trino, Flink, Airflow)
-- [x] Step 2 — Iceberg DDL — 20 tables (Bronze / Silver / Gold)
-- [x] Step 3 — Sonatel data generator (tests only)
-- [x] Step 3b — Streaming pipeline (NiFi + Kafka + PyFlink, exactly-once)
-- [x] Step 4 — dbt transformations — 18 models (Bronze → Silver → Gold)
-- [x] Step 5 — Airflow orchestration — batch + streaming DAG
-- [ ] Step 6 — Data quality (Great Expectations)
-- [ ] Step 7 — Observability (Prometheus, Grafana)
-- [ ] Step 8 — Security (Keycloak, Ranger)
-- [ ] Step 9 — Agentic intelligence layer (LangGraph, ReAct)
-
 ## Architecture Decision Records
 
 | ADR | Decision |
@@ -171,4 +162,5 @@ make airflow-trigger    # Trigger pipeline manually
 
 ## License
 
-[Apache License 2.0](LICENSE) — *Built with purpose. Named after the flow.*
+[Apache License 2.0](LICENSE)
+*Built with purpose. Named after the flow.*
