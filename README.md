@@ -3,6 +3,7 @@
 <p align="center">
   <img src="assets/ilam.png" 
        alt="Ilam Logo" 
+       height="100"
        width="800">
 </p>
 
