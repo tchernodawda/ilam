@@ -13,7 +13,7 @@
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" />
   </a>
-  <img src="https://img.shields.io/badge/stack-Iceberg%20%7C%20Trino%20%7C%20Flink%20%7C%20NiFi%20%7C%20dbt%20%7C%20Airflow-orange" />
+  <img src="https://img.shields.io/badge/stack-Iceberg%20%7C%20Trino%20%7C%20Spark%20%7C%20Flink%20%7C%20Kafka%20%7C%20NiFi%20%7C%20MinIO%20%7C%20dbt%20%7C%20Airflow%20%7C%20Ranger%20%7C%20Keycloak%20%7C%20Great%20Expectations%20%7C%20OpenLineage%20%7C%20LangGraph-orange" />
   <img src="https://img.shields.io/badge/status-WIP-yellow" />
   <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" />
 </p>
