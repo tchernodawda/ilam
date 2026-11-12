@@ -4,7 +4,7 @@
   <img src="assets/ilam.png" 
        alt="Ilam Logo" 
        height="300"
-       width="800">
+       width="500">
 </p>
 
 > *Ilam* means **"the lake"**, **"the flow"**, **"the water current"** in Pulaar: data flowing from raw sources to insight, continuously and autonomously.
@@ -164,4 +164,5 @@ make airflow-trigger    # Trigger pipeline manually
 ## License
 
 [Apache License 2.0](LICENSE)
+
 *Built with purpose. Named after the flow.*

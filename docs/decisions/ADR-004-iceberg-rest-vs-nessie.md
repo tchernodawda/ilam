@@ -1,4 +1,3 @@
-cat > ~/ilam/docs/decisions/ADR-004-iceberg-rest-vs-nessie.md << 'EOF'
 # ADR-004 — tabulario/iceberg-rest over Project Nessie
 
 **Date:** 2025
